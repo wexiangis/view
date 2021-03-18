@@ -4,12 +4,12 @@
 #   1: T31平台
 MAKE_PLATFORM = 0
 
-##### 通用平台配置 #####
+##### 通用fb平台对接 #####
 ifeq ($(MAKE_PLATFORM),0)
-cross = arm-linux-gnueabihf
+# cross = arm-linux-gnueabihf
 endif
 
-##### 自定义平台配置 #####
+##### T31平台配置 #####
 ifeq ($(MAKE_PLATFORM),1)
 cross = mips-linux-gnu
 DIR += ./platform/t31
@@ -22,17 +22,21 @@ MAKE_FREETYPE ?= 1
 # 启用jpeg文件支持 (0/不启用 1/启用)
 MAKE_JPEG ?= 1
 # 启用iconv用于UTF8文字检索支持 (0/不启用 1/启用)
-MAKE_ICONV ?= 1
+MAKE_ICONV ?= 0
 
 # 根据 MAKE_XXX 统计要编译的库列表
 ifeq ($(MAKE_FREETYPE),1)
 BUILD += libfreetype
+CFLAG += -lfreetype
 endif
 ifeq ($(MAKE_JPEG),1)
 BUILD += libjpeg
+INC += -I./libs/include/freetype2
+CFLAG += -ljpeg
 endif
 ifeq ($(MAKE_ICONV),1)
 BUILD += libiconv
+CFLAG += -liconv
 endif
 
 # 传递宏定义给代码
@@ -41,11 +45,12 @@ DEF += -DMAKE_JPEG=$(MAKE_JPEG)
 DEF += -DMAKE_ICONV=$(MAKE_ICONV)
 
 # 用于依赖库编译
-CC = gcc
-HOST =
+GCC = gcc
+GXX = g++
 ifdef cross
 	HOST = $(cross)
-	CC = $(cross)-gcc
+	GCC = $(cross)-gcc
+	GXX = $(cross)-g++
 endif
 
 # 根目录获取
@@ -65,10 +70,10 @@ CFLAG += -Wall -lm -lpthread
 OBJS = $(foreach n,$(DIR),${patsubst %.c,$(n)/%.o,${notdir ${wildcard $(n)/*.c}}})
 
 %.o:%.c
-	@$(CC) -c $< $(INC) $(LIB) $(CFLAG) $(DEF) -o $@
+	@$(GCC) -c $< $(INC) $(LIB) $(CFLAG) $(DEF) -o $@
 
 app: $(OBJS)
-	@$(CC) -o app $(OBJS) $(INC) $(LIB) $(CFLAG) $(DEF)
+	@$(GCC) -o app $(OBJS) $(INC) $(LIB) $(CFLAG) $(DEF)
 
 clean:
 	@rm app $(OBJS) -rf
@@ -97,7 +102,7 @@ libjpeg: libtool
 	sed -i 's/\x0D//' ./configure && \
 	sed -i 's/\x0D//' ./ltconfig && \
 	./configure --prefix=$(ROOT)/libs --host=$(HOST) --enable-shared && \
-	sed -i 's/CC= gcc/CC= $(CC)/' ./Makefile && \
+	sed -i 's/CC= gcc/CC= $(GCC)/' ./Makefile && \
 	cp $(ROOT)/libs/bin/libtool ./ && \
 	mkdir $(ROOT)/libs/man/man1 -p && \
 	make -j4 && make install && \
