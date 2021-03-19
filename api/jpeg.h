@@ -2,6 +2,15 @@
 #ifndef _JPEG_H_
 #define _JPEG_H_
 
+//接收来自 Makefile 的传参
+#ifdef MAKE_JPEG
+#define VIEW_JPEG MAKE_JPEG
+#else
+#define VIEW_JPEG 1
+#endif
+
+#if(VIEW_JPEG)
+
 // -------------------------- 文件数据整读整写模式 --------------------------
 
 /*
@@ -75,4 +84,6 @@ void jpeg_zoom(char *inFile, char *outFile, float zoom, int quality);
 //固定放大2.5倍,且要求输入图像宽高为5的整数倍
 void jpeg_zoom2(char *inFile, char *outFile, int quality);
 
-#endif
+#endif // #if(VIEW_JPEG)
+
+#endif // end of file

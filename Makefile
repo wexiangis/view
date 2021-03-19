@@ -7,6 +7,7 @@ MAKE_PLATFORM = 0
 ##### 通用fb平台对接 #####
 ifeq ($(MAKE_PLATFORM),0)
 # cross = arm-linux-gnueabihf
+DIR += ./platform/fb
 endif
 
 ##### T31平台配置 #####
@@ -20,7 +21,7 @@ endif
 # 启用ttf字体支持 (0/不启用 1/启用)
 MAKE_FREETYPE ?= 1
 # 启用jpeg文件支持 (0/不启用 1/启用)
-MAKE_JPEG ?= 1
+MAKE_JPEG ?= 0
 # 启用iconv用于UTF8文字检索支持 (0/不启用 1/启用)
 MAKE_ICONV ?= 0
 
@@ -28,10 +29,10 @@ MAKE_ICONV ?= 0
 ifeq ($(MAKE_FREETYPE),1)
 BUILD += libfreetype
 CFLAG += -lfreetype
+INC += -I./libs/include/freetype2
 endif
 ifeq ($(MAKE_JPEG),1)
 BUILD += libjpeg
-INC += -I./libs/include/freetype2
 CFLAG += -ljpeg
 endif
 ifeq ($(MAKE_ICONV),1)
@@ -57,7 +58,9 @@ endif
 ROOT = $(shell pwd)
 
 # 源文件包含
-DIR += ./src
+DIR += ./api
+DIR += ./usr
+DIR += ./usr/view
 # 库文件路径 -L
 LIB += -L./libs/lib
 # 头文件路径 -I
@@ -69,14 +72,14 @@ CFLAG += -Wall -lm -lpthread
 # 遍历DIR统计所有.o文件
 OBJS = $(foreach n,$(DIR),${patsubst %.c,$(n)/%.o,${notdir ${wildcard $(n)/*.c}}})
 
-%.o:%.c
+%.o: %.c
 	@$(GCC) -c $< $(INC) $(LIB) $(CFLAG) $(DEF) -o $@
 
-app: $(OBJS)
-	@$(GCC) -o app $(OBJS) $(INC) $(LIB) $(CFLAG) $(DEF)
+out: $(OBJS)
+	@$(GCC) -o out $(OBJS) $(INC) $(LIB) $(CFLAG) $(DEF)
 
 clean:
-	@rm app $(OBJS) -rf
+	@rm out $(OBJS) -rf
 
 cleanall: clean
 	@rm ./libs/* -rf

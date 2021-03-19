@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#if(VIEW_JPEG)
+
 #include "jpeglib.h"
 
 typedef struct
@@ -669,3 +671,5 @@ end:
     fclose(jpOut.fp);
     fclose(jpIn.fp);
 }
+
+#endif // #if(VIEW_JPEG)

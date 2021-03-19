@@ -1,4 +1,5 @@
 .vscode
 libs/*
-app
+out
 *.o
+test.bmp
