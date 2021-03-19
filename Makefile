@@ -7,6 +7,8 @@ MAKE_PLATFORM = 0
 ##### 通用fb平台对接 #####
 ifeq ($(MAKE_PLATFORM),0)
 # cross = arm-linux-gnueabihf
+# cross = arm-himix200-linux
+# cross = arm-himix100-linux
 DIR += ./platform/fb
 endif
 
@@ -18,12 +20,17 @@ CFLAG += -Wl,-gc-sections -lrt -ldl
 CFLAG += -muclibc # 使用 uclibc 时添加该项
 endif
 
+# 静态编译(优先使用.a库文件编译,程序直接能跑,但文件巨大)
+CFLAG += -static
+
 # 启用ttf字体支持 (0/不启用 1/启用)
 MAKE_FREETYPE ?= 1
 # 启用jpeg文件支持 (0/不启用 1/启用)
-MAKE_JPEG ?= 0
-# 启用iconv用于UTF8文字检索支持 (0/不启用 1/启用)
-MAKE_ICONV ?= 0
+MAKE_JPEG ?= 1
+# 启用png文件支持 (0/不启用 1/启用)
+MAKE_PNG ?= 1
+# 启用hiredis支持 (0/不启用 1/启用)
+MAKE_HIREDIS ?= 1
 
 # 根据 MAKE_XXX 统计要编译的库列表
 ifeq ($(MAKE_FREETYPE),1)
@@ -35,23 +42,29 @@ ifeq ($(MAKE_JPEG),1)
 BUILD += libjpeg
 CFLAG += -ljpeg
 endif
-ifeq ($(MAKE_ICONV),1)
-BUILD += libiconv
-CFLAG += -liconv
+ifeq ($(MAKE_PNG),1)
+BUILD += libpng
+CFLAG += -lz -lpng
+endif
+ifeq ($(MAKE_HIREDIS),1)
+BUILD += libhiredis
+CFLAG += -lhiredis
+INC += -I./libs/include/hiredis
 endif
 
 # 传递宏定义给代码
 DEF += -DMAKE_PLATFORM=$(MAKE_PLATFORM)
 DEF += -DMAKE_JPEG=$(MAKE_JPEG)
-DEF += -DMAKE_ICONV=$(MAKE_ICONV)
+DEF += -DMAKE_PNG=$(MAKE_PNG)
+DEF += -DMAKE_HIREDIS=$(MAKE_HIREDIS)
 
 # 用于依赖库编译
 GCC = gcc
-GXX = g++
+GPP = g++
 ifdef cross
 	HOST = $(cross)
 	GCC = $(cross)-gcc
-	GXX = $(cross)-g++
+	GPP = $(cross)-g++
 endif
 
 # 根目录获取
@@ -123,11 +136,32 @@ libfreetype:
 	cd - && \
 	rm $(ROOT)/libs/freetype-2.10.4 -rf
 
-# UTF8文字检索支持
-libiconv:
-	@tar -xzf $(ROOT)/pkg/libiconv-1.15.tar.gz -C $(ROOT)/libs && \
-	cd $(ROOT)/libs/libiconv-1.15 && \
-	./configure --prefix=$(ROOT)/libs --host=$(HOST) --enable-static --enable-shared && \
+# libpng依赖库
+zlib:
+	@tar -xzf $(ROOT)/pkg/zlib-1.2.11.tar.gz -C $(ROOT)/libs && \
+	cd $(ROOT)/libs/zlib-1.2.11 && \
+	sed -i '1i\CC=$(GCC)' ./configure && \
+	./configure --prefix=$(ROOT)/libs && \
 	make -j4 && make install && \
 	cd - && \
-	rm $(ROOT)/libs/libiconv-1.15 -rf
+	rm $(ROOT)/libs/zlib-1.2.11 -rf
+
+# UI怎么可以没有透明度文件
+libpng: zlib
+	@tar -xzf $(ROOT)/pkg/libpng-1.6.37.tar.gz -C $(ROOT)/libs && \
+	cd $(ROOT)/libs/libpng-1.6.37 && \
+	./configure --prefix=$(ROOT)/libs --host=$(HOST) LDFLAGS="-L$(ROOT)/libs/lib" CFLAGS="-I$(ROOT)/libs/include" CPPFLAGS="-I$(ROOT)/libs/include" && \
+	make -j4 && make install && \
+	cd - && \
+	rm $(ROOT)/libs/libpng-1.6.37 -rf
+
+# redis的c语言轻量版本
+libhiredis:
+	@tar -xzf $(ROOT)/pkg/hiredis-1.0.0.tar.gz -C $(ROOT)/libs && \
+	cd $(ROOT)/libs/hiredis-1.0.0 && \
+	sed -i '/^PREFIX?=/a\PREFIX=$(ROOT)/libs' ./Makefile && \
+	sed -i '/^CC:=/a\CC=$(GCC)' ./Makefile && \
+	sed -i '/^CXX:=/a\CXX=$(GPP)' ./Makefile && \
+	make -j4 CFLAGS="-lm" && make install && \
+	cd - && \
+	rm $(ROOT)/libs/hiredis-1.0.0 -rf

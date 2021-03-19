@@ -4,11 +4,9 @@
 #define PLATFORM_FB 0  // 通用平台
 #define PLATFORM_T31 1 // T31平台
 
-// 接收来自 Makefile 的传参
-#ifdef MAKE_PLATFORM
-#define VIEW_PLATFORM MAKE_PLATFORM
-#else
-#define VIEW_PLATFORM PLATFORM_FB
+// 如果Makefile没有定义则自行定义
+#ifndef MAKE_PLATFORM
+#define MAKE_PLATFORM PLATFORM_FB
 #endif
 
 // ===== T31平台对接 =====
@@ -32,7 +30,6 @@
 #define PRINT_DOT2(x, y, rgb, alpha) fb_print_dot2(x, y, rgb, alpha)
 #define PRINT_EN()                   fb_print_en()
 #define PRINT_CLEAR(rgb)             fb_print_clean(rgb)
-
 
 #endif
 

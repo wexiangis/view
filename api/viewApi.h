@@ -8,9 +8,10 @@
 #include "viewType.h"
 #include "viewSrc.h"
 
-#include "bmp.h"     //图片库
-#include "jpeg.h"    //图片库
-#include "ttfType.h" //矢量字体库
+#include "bmp.h"      //图片解析
+#include "jpegType.h" //图片解析
+#include "pngType.h"  //图片解析
+#include "ttfType.h"  //矢量字体解析
 
 //========== UI系统初始化 ==========
 
