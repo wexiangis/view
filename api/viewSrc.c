@@ -13,7 +13,7 @@ void viewConfig_init(void)
 
 void viewSrc_init(void)
 {
-#if(MAKE_FREETYPE)
+#if (MAKE_FREETYPE)
     //ttf字体解析句柄初始化
     ViewTTF = ttf_init(TTF_FILE);
 #endif
@@ -48,45 +48,20 @@ void viewSrc_init(void)
 
 void viewColor_init(void)
 {
-        viewValue_reset(&ViewColor.BackGround, "BackGround", VT_INT, 1, 0x000000);
-        viewValue_reset(&ViewColor.Content, "Content", VT_INT, 1, 0xFFFFFF);
-        viewValue_reset(&ViewColor.Label, "Label", VT_INT, 1, 0xFFFFFF);
-        viewValue_reset(&ViewColor.Tips, "Tips", VT_INT, 1, 0xFF8000);
-        viewValue_reset(&ViewColor.Button, "Button", VT_INT, 1, 0x4060FF);
-        viewValue_reset(&ViewColor.ButtonValue, "ButtonValue", VT_INT, 1, 0xFFFFFF);
-        viewValue_reset(&ViewColor.Focus, "Focus", VT_INT, 1, 0x00FF00);
+    ViewColor.BackGround = 0x000000;
+    ViewColor.Content = 0xFFFFFF;
+    ViewColor.Label = 0xFFFFFF;
+    ViewColor.Tips = 0xFF8000;
+    ViewColor.Button = 0x4060FF;
+    ViewColor.ButtonValue = 0xFFFFFF;
+    ViewColor.Focus = 0x00FF00;
 
-        viewValue_reset(&ViewColor.White, "White", VT_INT, 1, 0xFFFFFF);
-        viewValue_reset(&ViewColor.Black, "Black", VT_INT, 1, 0x202020);
-        viewValue_reset(&ViewColor.Gray, "Gray", VT_INT, 1, 0xD0D0D0);
-        viewValue_reset(&ViewColor.Gray2, "Gray2", VT_INT, 1, 0x808080);
-        viewValue_reset(&ViewColor.Gray3, "Gray3", VT_INT, 1, 0x404040);
-
-    //公共部分
-    if (ViewColor.Red.value.Int == 0) //只初始化一次
-    {
-        viewValue_reset(&ViewColor.Red, "Red", VT_INT, 1, 0xFF0000);
-        viewValue_reset(&ViewColor.Red2, "Red2", VT_INT, 1, 0xC00000);
-        viewValue_reset(&ViewColor.Red3, "Red3", VT_INT, 1, 0x800000);
-        viewValue_reset(&ViewColor.Green, "Green", VT_INT, 1, 0x00FF00);
-        viewValue_reset(&ViewColor.Green2, "Green2", VT_INT, 1, 0x00C000);
-        viewValue_reset(&ViewColor.Green3, "Green3", VT_INT, 1, 0x008000);
-        viewValue_reset(&ViewColor.Blue, "Blue", VT_INT, 1, 0x0000FF);
-        viewValue_reset(&ViewColor.Blue2, "Blue2", VT_INT, 1, 0x0000C0);
-        viewValue_reset(&ViewColor.Blue3, "Blue3", VT_INT, 1, 0x000080);
-        viewValue_reset(&ViewColor.Yellow, "Yellow", VT_INT, 1, 0xF0F000);
-        viewValue_reset(&ViewColor.Yellow2, "Yellow2", VT_INT, 1, 0xE0E000);
-        viewValue_reset(&ViewColor.Yellow3, "Yellow3", VT_INT, 1, 0xA0A000);
-        viewValue_reset(&ViewColor.Cyan, "Cyan", VT_INT, 1, 0x00FFFF);
-        viewValue_reset(&ViewColor.Cyan2, "Cyan2", VT_INT, 1, 0x00C0C0);
-        viewValue_reset(&ViewColor.Cyan3, "Cyan3", VT_INT, 1, 0x008080);
-        viewValue_reset(&ViewColor.Magenta, "Magenta", VT_INT, 1, 0xFF00FF);
-        viewValue_reset(&ViewColor.Magenta2, "Magenta2", VT_INT, 1, 0xC000C0);
-        viewValue_reset(&ViewColor.Magenta3, "Magenta3", VT_INT, 1, 0x800080);
-        viewValue_reset(&ViewColor.Orange, "Orange", VT_INT, 1, 0xFF8000);
-        viewValue_reset(&ViewColor.Orange2, "Orange2", VT_INT, 1, 0xC06000);
-        viewValue_reset(&ViewColor.Orange3, "Orange3", VT_INT, 1, 0x804000);
-    }
+    ViewColor.White = 0xFFFFFF;
+    ViewColor.Black = 0x202020;
+    ViewColor.Gray = 0x808080;
+    ViewColor.Red = 0xFF0000;
+    ViewColor.Green = 0x00FF00;
+    ViewColor.Blue = 0x0000FF;
 }
 
 bool viewSrc_compare(ViewValue_Format *value)

@@ -20,11 +20,9 @@ void view_init(void);
 //--------------------  基本画图接口 --------------------
 
 //画点
-void print_dot(int x, int y, int rgb);
-//alpha透明度0~100,不透明~完全透明
-void print_dot2(int x, int y, int rgb, int alpha);
+void print_dot(int x, int y, uint32_t color);
 //用rgb颜色清屏
-void print_clean(int rgb);
+void print_clean(uint32_t color);
 //使能输出
 void print_en(void);
 
@@ -34,7 +32,27 @@ void view_delayms(uint32_t ms);
 int view_tickMs(void);
 struct tm *view_time(void);
 
-//---------- 控件在链表中的 添加/插入/移除 方法 -----------
+//--------------------- 颜色和图片 --------------------
+
+//颜色透明度快速配置
+#define view_set_alpha(color, alpha) (((View_Point *)&color)->a = alpha & 0xFF)
+#define view_get_alpha(color) ((View_Point *)&color)->a
+
+void view_set_picAlpha(uint32_t *pic, uint8_t alpha, int width, int height, int pb);
+
+//图片数据格式整理
+void view_RGB_to_BGRA(uint8_t **pic, int width, int height);
+uint32_t *view_getPic(char *picPath, int *width, int *height, int *pb);
+
+/*
+ *  为什么要用 BGRA ?
+ * 
+ *  因为在用4字节整形表示颜色时,可以把不透明红色写作0xFF0000,
+ *  把半透明红色写作0x80FF0000,而这个整形的4字节内存顺序即为BGRA,
+ * 
+ */
+
+//---------------------- 链表操作 ---------------------
 
 //往 parent 的子链表添加 view,front=false 添加到尾,front=true 添加到头
 void view_add(View_Struct *parentView, View_Struct *view, bool front);
@@ -52,8 +70,6 @@ View_Struct *view_num(View_Struct *view, int n);
 //------------- 垃圾桶里的 unit/view 的释放 -------------
 
 void viewTrash_clean(void);
-
-//---------------------- 其它 ------------------------
 
 //-------------------- 控件的绘制 ----------------------
 
@@ -74,7 +90,7 @@ ViewCallBack view_touchLocal(
 
 //----------------------- Focus 操作 -------------------
 
-View_Focus *view_focusInit(View_Struct *topView, View_Struct *cView, ViewValue_Format *color);
+View_Focus *view_focusInit(View_Struct *topView, View_Struct *cView, uint32_t color);
 void view_focusRecover(View_Focus *focus);
 void view_focusNote(View_Focus *focus, View_Struct *view);
 void view_focusJump(View_Focus *focus, View_Struct *jumpView);
@@ -105,95 +121,71 @@ int view_getType(char *text, int width, int xEdge);
 //---------------------- 公共绘图方法 ------------------------
 
 void view_dot(
-    int color,
+    uint32_t color,
     int xStart, int yStart,
-    int size, int alpha);
-int view_getDot(
-    int xStart, int yStart,
-    int xEnd, int yEnd,
-    int *dotX, int *dotY);
+    int size);
 void view_line(
-    int color,
+    uint32_t color,
     int xStart, int yStart,
     int xEnd, int yEnd,
-    int size, int space, int alpha);
+    int size, int space);
 void view_circle(
-    int color,
+    uint32_t color,
     int xStart, int yStart,
     int rad, int size,
-    int alpha,
     int minX, int minY,
     int maxX, int maxY);
 void view_circleLoop(
-    int color,
+    uint32_t color,
     int xStart, int yStart,
     int rad,
     int size,
     int div,
     int divStart, int divEnd);
 void view_rectangle(
-    int color,
+    uint32_t color,
     int xStart, int yStart,
     int xEnd, int yEnd,
-    int size, int rad, int alpha,
+    int size, int rad,
     int minX, int minY,
     int maxX, int maxY);
 void view_rectangle_padding(
-    uint8_t *pic,
+    uint32_t *pic,
     int xStart, int yStart,
     int xEnd, int yEnd,
-    int picWidth, int picHeight, int picPB,
-    bool picUseReplaceColor,
-    int picReplaceColor,
-    int picReplaceColorBy,
-    bool picUseInvisibleColor,
-    int picInvisibleColor, int alpha,
-    int xMin, int yMin, int xMax, int yMax);
-void view_rectangle_padding2(
-    uint8_t ***picMap,
-    int xStart, int yStart,
-    int xEnd, int yEnd,
-    int picWidth, int picHeight, int picPB,
-    bool picUseReplaceColor,
-    int picReplaceColor,
-    int picReplaceColorBy,
-    bool picUseInvisibleColor,
-    int picInvisibleColor, int alpha,
+    int picWidth, int picHeight,
+    bool useReplaceColor,
+    uint32_t replaceColor,
+    uint32_t replaceColorBy,
     int xMin, int yMin, int xMax, int yMax);
 void view_parallelogram(
-    int color,
+    uint32_t color,
     int xStart, int yStart,
     int xEnd, int yEnd,
-    int size, int width, int alpha,
+    int size, int width,
     int minX, int minY,
     int maxX, int maxY);
 void view_printBitMap(
-    int fColor, int bColor,
-    int xStart, int yStart,
-    Ttf_Map map);
-void view_printBitMap2(
-    int fColor, int bColor,
+    uint32_t fColor, uint32_t bColor,
     int xStart, int yStart,
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
-    int alpha,
     Ttf_Map map);
 void view_string(
-    int fColor,
-    int bColor, char *str,
+    uint32_t fColor, uint32_t bColor,
+    char *str,
     int xStart, int yStart,
     int type, int space);
 void view_string_rectangle(
-    int fColor, int bColor,
+    uint32_t fColor, uint32_t bColor,
     char *str,
     int xStart, int yStart,
     int strWidth, int strHight,
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
-    int type, int space,
-    int alpha);
+    int type, int space);
 int view_string_rectangleLineWrap(
-    int fColor, int bColor,
+    uint32_t fColor, uint32_t bColor,
     char *str,
     int xStart, int yStart,
     int strWidth, int strHight,
@@ -201,17 +193,15 @@ int view_string_rectangleLineWrap(
     int xScreenEnd, int yScreenEnd,
     int type,
     int xSpace, int ySpace,
-    int alpha,
     int *retWordPerLine,
     int *retLine);
 int view_string_rectangleCR(
-    int fColor, int bColor,
+    uint32_t fColor, uint32_t bColor,
     char *str,
     int xStart, int yStart,
     int strWidth, int strHight,
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
-    int type, int space, int xErr,
-    int alpha);
+    int type, int space, int xErr);
 
 #endif

@@ -8,10 +8,10 @@ int view_bar_vStart(View_Struct *view, void *object, View_Focus *focus, ViewButt
     //1秒周期
     if (view->tickMs / 1000 != tickSec)
     {
-        tickSec = view->tickMs / 1000;
+        tickSec = view->tickMs / 1000 % 60;
         //更新时间
-        view->view->value->value.IntArray[2] = tickSec % 60;
-        view->view->valueAlpha = (10 - tickSec % 10) * 10;
+        view->view->value->value.IntArray[2] = tickSec;
+        view_set_alpha(view->view->valueColor, tickSec % 25 * 10);
     }
 
     return CALLBACK_OK;
@@ -35,8 +35,7 @@ View_Struct *view_bar_init(void)
     vsTemp->value->param[0] = '/'; //分隔符
     vsTemp->value->param[1] = 2;   //保留2个0
     vsTemp->valueType = 240;
-    vsTemp->valueColor = &ViewColor.White;
-    vsTemp->valueAlpha = 50;
+    vsTemp->valueColor = 0x80FFFFFF;
     view_add(vs, vsTemp, false);
 
     //电量图标
@@ -44,8 +43,8 @@ View_Struct *view_bar_init(void)
     vsTemp->width = BAR_ICON_WIDTH;
     vsTemp->height = BAR_HEIGHT;
     vsTemp->rType = VRT_RIGHT; //靠在父控件(内部)右边
-    vsTemp->picPath = "./usr/src/edit.bmp";
-    vsTemp->picUseInvisibleColor = true;
+    // vsTemp->picPath = "./usr/src/edit.bmp";
+    vsTemp->picPath = "./usr/src/signal.png";
     view_add(vs, vsTemp, false);
 
     //电量百分数
@@ -57,7 +56,7 @@ View_Struct *view_bar_init(void)
     vsTemp->value = viewValue_init("percent", VT_INT_ARRAY, 1, 95);
     vsTemp->value->param[0] = '%'; //分隔符
     vsTemp->valueType = 240;
-    vsTemp->valueColor = &ViewColor.White;
+    vsTemp->valueColor = 0xFF0000;
     view_add(vs, vsTemp, false);
 
     return vs;

@@ -32,41 +32,19 @@ typedef struct ViewSrcType
 //全局开放的颜色参数
 typedef struct ViewColorType
 {
-    //选型部分
-    ViewValue_Format BackGround;  //背景
-    ViewValue_Format Content;     //内容
-    ViewValue_Format Label;       //注释
-    ViewValue_Format Tips;        //右上角标
-    ViewValue_Format Button;      //按键
-    ViewValue_Format ButtonValue; //按键
-    ViewValue_Format Focus;       //按键
-    ViewValue_Format White;
-    ViewValue_Format Black;
-    ViewValue_Format Gray;
-    ViewValue_Format Gray2;
-    ViewValue_Format Gray3;
-    //公共部分
-    ViewValue_Format Red;
-    ViewValue_Format Red2;
-    ViewValue_Format Red3;
-    ViewValue_Format Green;
-    ViewValue_Format Green2;
-    ViewValue_Format Green3;
-    ViewValue_Format Blue;
-    ViewValue_Format Blue2;
-    ViewValue_Format Blue3;
-    ViewValue_Format Yellow;
-    ViewValue_Format Yellow2;
-    ViewValue_Format Yellow3;
-    ViewValue_Format Cyan; //天蓝色(绿+蓝)
-    ViewValue_Format Cyan2;
-    ViewValue_Format Cyan3;
-    ViewValue_Format Magenta; //紫色(红+蓝)
-    ViewValue_Format Magenta2;
-    ViewValue_Format Magenta3;
-    ViewValue_Format Orange;
-    ViewValue_Format Orange2;
-    ViewValue_Format Orange3;
+    uint32_t BackGround;  //背景
+    uint32_t Content;     //内容
+    uint32_t Label;       //注释
+    uint32_t Tips;        //右上角标
+    uint32_t Button;      //按键
+    uint32_t ButtonValue; //按键
+    uint32_t Focus;       //按键
+    uint32_t White;
+    uint32_t Black;
+    uint32_t Gray;
+    uint32_t Red;
+    uint32_t Green;
+    uint32_t Blue;
 } ViewColor_Type;
 
 //全局开放的ui配置,将保存到文件

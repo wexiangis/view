@@ -6,6 +6,17 @@
 #if (MAKE_PNG)
 #include "libpng16/png.h"
 
+//读取图片时以255作为最大透明度
+#define PNG_ALPHA_MAX_BY_255_ON_READ
+
+static uint32_t png_types[] = {
+    PNG_FORMAT_RGB,
+    PNG_FORMAT_BGR,
+    PNG_FORMAT_RGBA,
+    PNG_FORMAT_BGRA,
+    PNG_FORMAT_ARGB,
+    PNG_FORMAT_ABGR};
+
 /*
  *  png 图片数据获取
  *  参数:
@@ -15,10 +26,13 @@
  *      pixelBytes: 返回图片每像素的字节数, 不接收置NULL
  *  返回: argb图片数据指针,不透明~完全透明 !! 用完记得free()释放 !!
  */
-uint8_t *png_get(char *file, int *width, int *height, int *pixelBytes)
+uint8_t *png_get(char *file, int *width, int *height, int *pixelBytes, Png_Type pt)
 {
     uint8_t *argb = NULL;
     png_image image;
+#ifdef PNG_ALPHA_MAX_BY_255_ON_READ
+    int i;
+#endif
 
     memset(&image, 0, (sizeof image));
     image.version = PNG_IMAGE_VERSION;
@@ -36,12 +50,12 @@ uint8_t *png_get(char *file, int *width, int *height, int *pixelBytes)
     if (height)
         *height = image.height;
     if (pixelBytes)
-        *pixelBytes = 4;
+        *pixelBytes = pt > PT_BGR ? 4 : 3;
 
     argb = (uint8_t *)calloc(image.width * image.height * 4, 1);
 
     //设置目标格式
-    image.format = PNG_FORMAT_ARGB;
+    image.format = png_types[pt];
 
     //开始读取和转换数据
     if (!png_image_finish_read(
@@ -53,6 +67,14 @@ uint8_t *png_get(char *file, int *width, int *height, int *pixelBytes)
     {
         fprintf(stderr, "png_image_finish_read failed \r\n");
     }
+#ifdef PNG_ALPHA_MAX_BY_255_ON_READ
+    else if (pt > PT_BGR)
+    {
+        //对透明度进行取反,即255时为完全透明
+        for (i = pt > PT_BGRA ? 0 : 3; i < image.width * image.height * 4; i += 4)
+            argb[i] = ~argb[i];
+    }
+#endif
 
 exit:
     return argb;
@@ -65,10 +87,9 @@ exit:
  *      argb: 原始数据,根据pixelBytes值决定是否有a值
  *      width: 宽(像素)
  *      height: 高(像素)
- *      pixelBytes: 每像素字节数,3(rgb)或者4(argb)
  *  返回: 0成功 -1失败
  */
-int png_create(char *file, uint8_t *argb, int width, int height, int pixelBytes)
+int png_create(char *file, uint8_t *argb, int width, int height, Png_Type pt)
 {
     png_image image;
 
@@ -78,7 +99,7 @@ int png_create(char *file, uint8_t *argb, int width, int height, int pixelBytes)
     //参数准备
     image.width = width;
     image.height = height;
-    image.format = pixelBytes == 4 ? PNG_FORMAT_ARGB : PNG_FORMAT_RGB;
+    image.format = png_types[pt];
 
     if (png_image_write_to_file(
             &image,

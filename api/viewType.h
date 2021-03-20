@@ -10,6 +10,14 @@
 #include <pthread.h> //pthread_xxx
 #include <stdarg.h>  //变长参数
 
+typedef struct
+{
+    uint8_t b;
+    uint8_t g;
+    uint8_t r;
+    uint8_t a;
+} View_Point;
+
 //========== 数据类型代号 ==========
 typedef enum
 {
@@ -328,7 +336,7 @@ typedef struct ViewStruct
     int rLeftRightErr;
 
     //横/纵向 相对父控件居中(优先于上面 rTopBottomErr rLeftRightErr 判定)
-    bool centerHor, centerVer;
+    bool centerX, centerY;
 
     //真实宽高 [系统赋值]
     int absWidth, absHeight;
@@ -348,18 +356,14 @@ typedef struct ViewStruct
 
     DrawCallBack drawStart;
 
-    //---------- 背景色 ----------
+    //----------- 背景色 ------------
 
     //背景颜色的颜色,绘制范围为 absXY[2][2]
-    ViewValue_Format *backGroundColor;
-
+    uint32_t backGroundColor;
     //圆角
     int backGroundRad;
 
-    //透明度0~100,不透明~完全透明
-    int backGroundAlpha;
-
-    //---------- 形状 ----------
+    //------------- 形状 -------------
 
     //形状 0 默认为矩形
     ViewShape_Type shapeType;
@@ -375,18 +379,15 @@ typedef struct ViewStruct
     int shapeAbsXY[2][2];
 
     //不同形状 shapeColorPrint 参数意义不同(看上面"104行"的说明)
-    ViewValue_Format *shapeColorPrint;      //默认为打印色
-    ViewValue_Format *shapeColorBackground; //默认为打底色
-
-    //透明度0~100,不透明~完全透明
-    int shapeAlpha;
+    uint32_t shapeColorPrint;      //默认为打印色
+    uint32_t shapeColorBackground; //默认为打底色
 
     //---------- 图片 ----------
 
     //图片路径,不为NULL时启用
     char *picPath;
     //备用指针, 用来检查图片是否已更改 [系统赋值]
-    char *picPath_bak;
+    char *picPathBakup;
 
     //文字输出框相对于控件在4个方向上的缩进,用以确定输出范围
     int picTopEdge, picBottomEdge;
@@ -396,24 +397,15 @@ typedef struct ViewStruct
     int picAbsXY[2][2];
 
     //图片原始数据 [系统赋值]
-    uint8_t *pic;
-    //指向图片原始数据的指针矩阵 [系统赋值]
-    uint8_t ***picMap;
+    uint32_t *pic;
 
     //图片的实际 宽/高/像素字节 [系统赋值]
     int picWidth, picHeight, picPB;
 
     //使用替换颜色
-    bool picUseReplaceColor;             //启用替换
-    int picReplaceColor;                 //目标颜色值
-    ViewValue_Format *picReplaceColorBy; //替换成
-
-    //使用透过颜色
-    bool picUseInvisibleColor; //启用透明色
-    int picInvisibleColor;     //指定透明色
-
-    //透明度0~100,不透明~完全透明
-    int picAlpha;
+    bool picUseReplaceColor;    //启用替换
+    uint32_t picReplaceColor;   //目标颜色值
+    uint32_t picReplaceColorBy; //替换成
 
     //---------- 内容 ----------
 
@@ -443,7 +435,7 @@ typedef struct ViewStruct
     int valueType;
 
     //字颜色
-    ViewValue_Format *valueColor;
+    uint32_t valueColor;
 
     //横向字间距
     int valueXEdge;
@@ -460,17 +452,12 @@ typedef struct ViewStruct
     //计数,满 scrollPeriod 时 scrollCount+1 [系统赋值]
     int scrollCount2;
 
-    //透明度0~100,不透明~完全透明
-    int valueAlpha;
-
     //---------- 下划线 ----------
 
     //下划线 >0启用并表示线宽,与控件的 width 同长度
     int bottomLine;
-    ViewValue_Format *bottomLineColor;
-
-    //透明度0~100,不透明~完全透明
-    int bottomLineAlpha;
+    //下划线颜色
+    uint32_t bottomLineColor;
 
     //---------- 描边 ---------- [主要用于 focus]
 
@@ -478,7 +465,7 @@ typedef struct ViewStruct
     int side;
 
     //描边的颜色
-    ViewValue_Format *sideColor;
+    uint32_t sideColor;
 
     //---------- 其它标注 ----------
 
@@ -554,10 +541,9 @@ typedef enum
 typedef struct ViewFocus
 {
     View_Struct *topView;
-    View_Struct *view;       //当前view
-    ViewValue_Format *color; //聚焦时绘制颜色
+    View_Struct *view; //当前view
+    uint32_t color;    //聚焦时绘制颜色
     int lineSize;
-    int alpha;
 } View_Focus;
 
 //========== 触屏事件 结构 ==========

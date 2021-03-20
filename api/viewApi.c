@@ -32,56 +32,44 @@ void view_init(void)
 
 //--------------------  基本画图接口 --------------------
 
-void print_dot(int x, int y, int rgb)
+void print_dot(int x, int y, uint32_t color)
 {
-    if (rgb < 0 ||
-        x < 0 || x > VIEW_X_END ||
+    //边界检查
+    if (x < 0 || x > VIEW_X_END ||
         y < 0 || y > VIEW_Y_END)
         return;
 
-    view_map->rgb[y][x][2] = (uint8_t)(rgb & 0xFF);
-    rgb >>= 8;
-    view_map->rgb[y][x][1] = (uint8_t)(rgb & 0xFF);
-    rgb >>= 8;
-    view_map->rgb[y][x][0] = (uint8_t)(rgb & 0xFF);
-}
+    //序列化成结构体,直接忽略掉a值
+    View_Point p = *((View_Point *)&color);
 
-//alpha透明度0~100,不透明~完全透明
-void print_dot2(int x, int y, int rgb, int alpha)
-{
-    if (rgb < 0 ||
-        x < 0 || x > VIEW_X_END ||
-        y < 0 || y > VIEW_Y_END)
-        return;
-
-    view_map->rgb[y][x][2] = (uint8_t)((view_map->rgb[y][x][2] * alpha + (uint8_t)(rgb & 0xFF) * (100 - alpha)) / 100);
-    rgb >>= 8;
-    view_map->rgb[y][x][1] = (uint8_t)((view_map->rgb[y][x][1] * alpha + (uint8_t)(rgb & 0xFF) * (100 - alpha)) / 100);
-    rgb >>= 8;
-    view_map->rgb[y][x][0] = (uint8_t)((view_map->rgb[y][x][0] * alpha + (uint8_t)(rgb & 0xFF) * (100 - alpha)) / 100);
-}
-
-void print_clean(int rgb)
-{
-    int x, y, c;
-
-    uint8_t R = (uint8_t)((rgb & 0xFF0000) >> 16);
-    uint8_t G = (uint8_t)((rgb & 0x00FF00) >> 8);
-    uint8_t B = (uint8_t)(rgb & 0x0000FF);
-
-    if (R == G && G == B)
-        memset(view_map->map, R, sizeof(View_Map));
+    //完全不透明,直接拷贝
+    if (!p.a)
+    {
+        view_map->rgb[y][x][0] = p.r;
+        view_map->rgb[y][x][1] = p.g;
+        view_map->rgb[y][x][2] = p.b;
+    }
+    else if (p.a == 0xFF)
+        ;
+    //透明则按比例权重
     else
     {
-        for (y = 0, c = 0; y < VIEW_Y_SIZE; y++)
-        {
-            for (x = 0; x < VIEW_X_SIZE; x++)
-            {
-                view_map->map[c++] = R;
-                view_map->map[c++] = G;
-                view_map->map[c++] = B;
-            }
-        }
+        view_map->rgb[y][x][0] = (uint8_t)((view_map->rgb[y][x][0] * p.a + p.r * (255 - p.a)) / 255);
+        view_map->rgb[y][x][1] = (uint8_t)((view_map->rgb[y][x][1] * p.a + p.g * (255 - p.a)) / 255);
+        view_map->rgb[y][x][2] = (uint8_t)((view_map->rgb[y][x][2] * p.a + p.b * (255 - p.a)) / 255);
+    }
+}
+
+void print_clean(uint32_t color)
+{
+    //序列化成结构体,直接忽略掉a值
+    View_Point p = *((View_Point *)&color);
+    int i;
+    for (i = 0; i < VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB;)
+    {
+        view_map->map[i++] = p.r;
+        view_map->map[i++] = p.g;
+        view_map->map[i++] = p.b;
     }
 }
 
@@ -125,72 +113,81 @@ struct tm *view_time(void)
 //--------------------- 图片内存管理 --------------------
 
 /*
- *  1. 把传入的rgb或argb(看pb字节数)数据转换为argb
- *  2. 返回生成的二维指针网格
+ *  设置BGRA格式的图片整体透明度
+ *  参数:
+ *      pic: 长度为 width * height * sizeof(uint32_t) 的数据
+ *      pb: 每像素字节数,检查项,必须为4
  */
-uint8_t ***picMap_init(uint8_t **pic, int width, int height, int *pb)
+void view_set_picAlpha(uint32_t *pic, uint8_t alpha, int width, int height, int pb)
 {
-    uint8_t ***pMap;
-    int i, j, offset;
-    //备份原数据
-    uint8_t *picOld = *pic;
-    uint8_t *picNew = *pic;
-    int pbOld = *pb;
-    int pbNew = *pb;
-
-    if (!picOld ||
-        width < 1 || height < 1 ||
-        (pbOld != 3 && pbOld != 4))
-    {
-        fprintf(stderr, "picMap_init failed, %p %d x %d x %d \r\n",
-            picOld, width, height, pbOld);
-        return NULL;
-    }
-
-    //把rgb数据转为argb数据
-    if (pbOld == 3)
-    {
-        pbNew = 4;
-        picNew = (uint8_t *)calloc(width * height * 4, 1);
-        //拓展rgb数据为argb,其中a值使用255
-        for (i = j = 0; i < width * height * pbOld;)
-        {
-            //写一个A值,拷贝3个RGB值
-            picNew[j++] = 255;
-            picNew[j++] = picOld[i++];
-            picNew[j++] = picOld[i++];
-            picNew[j++] = picOld[i++];
-        }
-        //释放旧内存
-        free(picOld);
-    }
-    //生成 width*height 的指针网格,每个指针指向一组ARGB数据
-    pMap = (uint8_t ***)calloc(height, sizeof(uint8_t **));
-    for (i = 0, offset = 0; i < height; i++)
-    {
-        pMap[i] = (uint8_t **)calloc(width, sizeof(uint8_t *));
-        for (j = 0; j < width; j++)
-        {
-            pMap[i][j] = &picNew[offset];
-            offset += pbNew;
-        }
-    }
-    //更新数据
-    *pic = picNew;
-    *pb = pbNew;
-    return pMap;
-}
-/*
- *  二维指针网格内存回收
- */
-void picMap_release(uint8_t ***picMap, int width, int height)
-{
+    View_Point *p = (View_Point *)pic;
     int i;
-    if (!picMap)
+    if (pb != 4)
         return;
-    for (i = 0; i < height; i++)
-        free(picMap[i]);
-    free(picMap);
+    for (i = 0; i < width * height; i++)
+        (p++)->a = alpha;
+}
+
+/*
+ *  转换RGB格式的数据为BGRA(重新分配内存)
+ */
+void view_RGB_to_BGRA(uint8_t **pic, int width, int height)
+{
+    uint8_t *picNew = *pic;
+    uint8_t *picOld = *pic;
+    int i, j;
+
+    picNew = (uint8_t *)calloc(width * height * 4, 1);
+
+    for (i = j = 0; j < width * height * 3; j += 3)
+    {
+        picNew[i++] = picOld[j + 2];
+        picNew[i++] = picOld[j + 1];
+        picNew[i++] = picOld[j];
+        picNew[i++] = 0;
+    }
+
+    *pic = picNew;
+    free(picOld);
+}
+
+/*
+ *  读取png、jpg、bmp数据,并转换为BGRA格式
+ *  参数:
+ *      pb: 返回每像素字节数,必定为4
+ *  返回: BGRA格式的图片数据,NULL失败
+ */
+uint32_t *view_getPic(char *picPath, int *width, int *height, int *pb)
+{
+    uint8_t *ret = NULL;
+
+    //png 格式直接转换BGRA,不需后处理
+#if (MAKE_PNG)
+    if (strstr(picPath, ".png") || strstr(picPath, ".PNG"))
+    {
+        ret = png_get(picPath, width, height, pb, PT_BGRA);
+        if (ret)
+            return (uint32_t *)ret;
+    }
+#endif
+
+    //jpeg 和 bmp 读取数据默认为RGB格式,需转为BGRA格式
+#if (MAKE_PNG)
+    if (strstr(picPath, ".jpg") || strstr(picPath, ".JPG") ||
+        strstr(picPath, ".jpeg") || strstr(picPath, ".JPEG"))
+        ret = jpeg_get(picPath, width, height, pb);
+#endif
+    if (!ret)
+        ret = bmp_get(picPath, width, height, pb);
+
+    //转换格式
+    if (ret)
+    {
+        *pb = 4;
+        view_RGB_to_BGRA(&ret, *width, *height);
+    }
+
+    return (uint32_t *)ret;
 }
 
 //公共顶view
@@ -235,42 +232,6 @@ void viewTrash_clean(void)
         if (vsThis->privateData)
             free(vsThis->privateData);
 
-        //颜色资源释放
-        if (vsThis->backGroundColor && !viewColor_compare(vsThis->backGroundColor))
-        {
-            viewValue_release(vsThis->backGroundColor);
-            vsThis->backGroundColor = NULL;
-        }
-        if (vsThis->shapeColorPrint && !viewColor_compare(vsThis->shapeColorPrint))
-        {
-            viewValue_release(vsThis->shapeColorPrint);
-            vsThis->shapeColorPrint = NULL;
-        }
-        if (vsThis->shapeColorBackground && !viewColor_compare(vsThis->shapeColorBackground))
-        {
-            viewValue_release(vsThis->shapeColorBackground);
-            vsThis->shapeColorBackground = NULL;
-        }
-        if (vsThis->picReplaceColorBy && !viewColor_compare(vsThis->picReplaceColorBy))
-        {
-            viewValue_release(vsThis->picReplaceColorBy);
-            vsThis->picReplaceColorBy = NULL;
-        }
-        if (vsThis->valueColor && !viewColor_compare(vsThis->valueColor))
-        {
-            viewValue_release(vsThis->valueColor);
-            vsThis->valueColor = NULL;
-        }
-        if (vsThis->bottomLineColor && !viewColor_compare(vsThis->bottomLineColor))
-        {
-            viewValue_release(vsThis->bottomLineColor);
-            vsThis->bottomLineColor = NULL;
-        }
-        if (vsThis->sideColor && !viewColor_compare(vsThis->sideColor))
-        {
-            viewValue_release(vsThis->sideColor);
-            vsThis->sideColor = NULL;
-        }
         //数据资源释放
         if (vsThis->value && !viewSrc_compare(vsThis->value))
         {
@@ -283,11 +244,6 @@ void viewTrash_clean(void)
             vsThis->valueBackup = NULL;
         }
         //图片内存释放
-        if (vsThis->picMap)
-        {
-            picMap_release(vsThis->picMap, vsThis->picWidth, vsThis->picHeight);
-            vsThis->picMap = NULL;
-        }
         if (vsThis->pic)
         {
             free(vsThis->pic);
@@ -337,10 +293,9 @@ void viewTrash_clean(void)
  *  返回: 无
  */
 void view_circle(
-    int color,
+    uint32_t color,
     int xStart, int yStart,
     int rad, int size,
-    int alpha,
     int minX, int minY,
     int maxX, int maxY)
 {
@@ -348,7 +303,7 @@ void view_circle(
     int circle_di;
     int circle_rad = rad;
     int circle_size = size;
-    //
+
     int xS = xStart - rad;
     int yS = yStart - rad;
     int xC, yC;
@@ -405,44 +360,24 @@ void view_circle(
         }
     }
     //输出
-    if (alpha == 0)
+    for (yC = 0; yC < xySize; yC += 1)
     {
-        for (yC = 0; yC < xySize; yC++)
+        yC2 = yS + yC;
+        if (yC2 < minY || yC2 > maxY)
+            continue;
+        for (xC = 0; xC < xySize; xC += 1)
         {
-            yC2 = yS + yC;
-            if (yC2 < minY || yC2 > maxY)
+            xC2 = xS + xC;
+            if (xC2 < minX || xC2 > maxX)
                 continue;
-            for (xC = 0; xC < xySize; xC++)
-            {
-                xC2 = xS + xC;
-                if (xC2 < minX || xC2 > maxX)
-                    continue;
-                else if (memBUff[yC][xC])
-                    print_dot(xC2, yC2, color);
-            }
-        }
-    }
-    else
-    {
-        for (yC = 0; yC < xySize; yC++)
-        {
-            yC2 = yS + yC;
-            if (yC2 < minY || yC2 > maxY)
-                continue;
-            for (xC = 0; xC < xySize; xC++)
-            {
-                xC2 = xS + xC;
-                if (xC2 < minX || xC2 > maxX)
-                    continue;
-                else if (memBUff[yC][xC])
-                    print_dot2(xC2, yC2, color, alpha);
-            }
+            else if (memBUff[yC][xC])
+                print_dot(xC2, yC2, color);
         }
     }
 }
 
 /*
- *  功能: 画圆环, 扇形, 扇形圆环
+ *  功能: 画圆环,扇形,扇形圆环
  *  参数:
  *      color : 颜色
  *      xStart :
@@ -454,7 +389,7 @@ void view_circle(
  *  返回: 无
  *  说明:
  */
-void view_circleLoop(int color, int xStart, int yStart, int rad, int size, int div, int divStart, int divEnd)
+void view_circleLoop(uint32_t color, int xStart, int yStart, int rad, int size, int div, int divStart, int divEnd)
 {
     int circle_a, circle_b;
     int circle_di;
@@ -566,7 +501,7 @@ void view_circleLoop(int color, int xStart, int yStart, int rad, int size, int d
                 i += 1;
             }
             //绘制一圈
-            for (i = 0, sumCount2 = sumCount - 1; i < sumCount; i++)
+            for (i = 0, sumCount2 = sumCount - 1; i < sumCount; i += 1)
             {
                 circle_a = intArray[i][0];
                 circle_b = intArray[i][1];
@@ -626,115 +561,28 @@ void view_circleLoop(int color, int xStart, int yStart, int rad, int size, int d
  *      size : 1~2
  *  返回: 无
  */
-void view_dot(int color, int xStart, int yStart, int size, int alpha)
+void view_dot(uint32_t color, int xStart, int yStart, int size)
 {
     if (size == 1)
-    {
-        if (alpha > 0)
-            print_dot2(xStart, yStart, color, alpha);
-        else
-            print_dot(xStart, yStart, color);
-    }
+        print_dot(xStart, yStart, color);
     else if (size == 2)
     {
-        if (alpha > 0)
-        {
-            //mid
-            print_dot2(xStart, yStart, color, alpha);
-            //up
-            print_dot2(xStart, yStart + 1, color, alpha);
-            //down
-            print_dot2(xStart, yStart - 1, color, alpha);
-            //left
-            print_dot2(xStart + 1, yStart, color, alpha);
-            //right
-            print_dot2(xStart - 1, yStart, color, alpha);
-        }
-        else
-        {
-            //mid
-            print_dot(xStart, yStart, color);
-            //up
-            print_dot(xStart, yStart + 1, color);
-            //down
-            print_dot(xStart, yStart - 1, color);
-            //left
-            print_dot(xStart + 1, yStart, color);
-            //right
-            print_dot(xStart - 1, yStart, color);
-        }
+        //mid
+        print_dot(xStart, yStart, color);
+        //up
+        print_dot(xStart, yStart + 1, color);
+        //down
+        print_dot(xStart, yStart - 1, color);
+        //left
+        print_dot(xStart + 1, yStart, color);
+        //right
+        print_dot(xStart - 1, yStart, color);
     }
     else if (size > 2)
-        view_circle(color, xStart, yStart, size, 0, alpha, 0, 0, 9999, 9999);
+        view_circle(color, xStart, yStart, size, 0, 0, 0, 9999, 9999);
 }
 
 //-------------------- 线 --------------------
-
-/*
- *  功能: 指定起止坐标, 返回两点间画线的Y坐标数组
- *  参数:
- *      xStart, yStart, xEnd, yEnd : 起止坐标
- *      dotX, dotY : Y坐标数组起始地址, 需要自己先分配好内存再传入
- *  返回: 点数
- */
-int view_getDot(int xStart, int yStart, int xEnd, int yEnd, int *dotX, int *dotY)
-{
-    unsigned short t;
-    int xerr = 0, yerr = 0;
-    int delta_x, delta_y;
-    int distance;
-    int incx, incy, xCount, yCount;
-
-    delta_x = xEnd - xStart; //计算坐标增量
-    delta_y = yEnd - yStart;
-    xCount = xStart;
-    yCount = yStart;
-
-    if (delta_x > 0)
-        incx = 1; //设置单步方向
-    else if (delta_x == 0)
-        incx = 0; //垂直线
-    else
-    {
-        incx = -1;
-        delta_x = -delta_x;
-    }
-
-    if (delta_y > 0)
-        incy = 1;
-    else if (delta_y == 0)
-        incy = 0; //水平线
-    else
-    {
-        incy = -1;
-        delta_y = -delta_y;
-    }
-
-    if (delta_x > delta_y)
-        distance = delta_x; //选取基本增量坐标轴
-    else
-        distance = delta_y;
-
-    for (t = 0; t <= distance + 1; t++) //画线输出
-    {
-        *dotX++ = xCount;
-        *dotY++ = yCount;
-
-        xerr += delta_x;
-        yerr += delta_y;
-        if (xerr > distance)
-        {
-            xerr -= distance;
-            xCount += incx;
-        }
-        if (yerr > distance)
-        {
-            yerr -= distance;
-            yCount += incy;
-        }
-    }
-    return distance + 2;
-}
 
 /*
  *  功能: 划线函数
@@ -744,7 +592,7 @@ int view_getDot(int xStart, int yStart, int xEnd, int yEnd, int *dotX, int *dotY
  *      space : 不为0时画的是虚线, 其值代表虚线的点密度
  *  返回: 无
  */
-void view_line(int color, int xStart, int yStart, int xEnd, int yEnd, int size, int space, int alpha)
+void view_line(uint32_t color, int xStart, int yStart, int xEnd, int yEnd, int size, int space)
 {
     unsigned short t;
     int xerr = 0, yerr = 0;
@@ -788,8 +636,8 @@ void view_line(int color, int xStart, int yStart, int xEnd, int yEnd, int size, 
 
     if (distance > 1000)
     {
-        printf("%d - %d , %d - %d , %d too large\n",
-               xStart, xEnd, yStart, yEnd, distance);
+        fprintf(stderr, "%d - %d , %d - %d , %d over line\n",
+                xStart, xEnd, yStart, yEnd, distance);
         return;
     }
 
@@ -806,12 +654,12 @@ void view_line(int color, int xStart, int yStart, int xEnd, int yEnd, int size, 
         spaceCount = 0;
     }
 
-    for (t = 0; t <= distance + 1; t++) //画线输出
+    for (t = 0; t <= distance + 1; t += 1) //画线输出
     {
         if (spaceVal == 0 || spaceCount < 0)
         {
             spaceCount += 1;
-            view_dot(color, xCount, yCount, size, alpha);
+            view_dot(color, xCount, yCount, size);
         }
         else
         {
@@ -844,15 +692,14 @@ void view_line(int color, int xStart, int yStart, int xEnd, int yEnd, int size, 
  *      xStart, yStart, xEnd, yEnd : 起止坐标
  *      size : 线宽
  *      rad : 圆角半径
- *      alpha : 0:实心填充  1:半透填充
  *      minY, maxY : 超出上下 Y 坐标部分不绘制
  *  返回: 无
  */
 void view_rectangle(
-    int color,
+    uint32_t color,
     int xStart, int yStart,
     int xEnd, int yEnd,
-    int size, int rad, int alpha,
+    int size, int rad,
     int minX, int minY,
     int maxX, int maxY)
 {
@@ -876,6 +723,7 @@ void view_rectangle(
         circle_rad = 0;
     if (sSize < 0)
         sSize = 0;
+
     // 矩阵端点整理
     if (xS > xE && yS <= yE) // 交换x坐标
     {
@@ -911,7 +759,7 @@ void view_rectangle(
 
     //缓存数组初始化
     outPutArray = (char **)calloc(ySize, sizeof(char *));
-    for (i = 0; i < ySize; i++)
+    for (i = 0; i < ySize; i += 1)
         outPutArray[i] = (char *)calloc(xSize, sizeof(char));
 
     //腰两竖
@@ -919,19 +767,19 @@ void view_rectangle(
     {
         if (sSize > 0)
         {
-            for (i = circle_rad; i < ySize - circle_rad; i++)
+            for (i = circle_rad; i < ySize - circle_rad; i += 1)
             {
-                for (j = 0; j < sSize; j++)
+                for (j = 0; j < sSize; j += 1)
                     outPutArray[i][j] = 1;
-                for (j = xSize - sSize; j < xSize; j++)
+                for (j = xSize - sSize; j < xSize; j += 1)
                     outPutArray[i][j] = 1;
             }
         }
         else
         {
-            for (i = circle_rad; i < ySize - circle_rad; i++)
+            for (i = circle_rad; i < ySize - circle_rad; i += 1)
             {
-                for (j = 0; j < xSize; j++)
+                for (j = 0; j < xSize; j += 1)
                     outPutArray[i][j] = 1;
             }
         }
@@ -945,15 +793,15 @@ void view_rectangle(
     if (sSize > 0 && xSize > circle_rad)
     {
         //上横
-        for (i = 0; i < temp; i++)
+        for (i = 0; i < temp; i += 1)
         {
-            for (j = circle_rad; j < xSize - circle_rad; j++)
+            for (j = circle_rad; j < xSize - circle_rad; j += 1)
                 outPutArray[i][j] = 1;
         }
         //下横
-        for (i = ySize - temp; i < ySize; i++)
+        for (i = ySize - temp; i < ySize; i += 1)
         {
-            for (j = circle_rad; j < xSize - circle_rad; j++)
+            for (j = circle_rad; j < xSize - circle_rad; j += 1)
                 outPutArray[i][j] = 1;
         }
     }
@@ -1052,7 +900,7 @@ void view_rectangle(
                             xC = circle_localCentre[0][0] - circle_a; //8 x
                             k = circle_localCentre[1][0] + circle_a;  //1 x
                             yC = circle_compare[0];
-                            for (; xC < k; xC++)
+                            for (; xC < k; xC += 1)
                                 outPutArray[yC][xC] = 1;
                         }
                         if (circle_localCentre[3][1] + circle_b < circle_compare[3]) //4, 5  y
@@ -1062,7 +910,7 @@ void view_rectangle(
                             xC = circle_localCentre[2][0] - circle_a; //5 x
                             k = circle_localCentre[3][0] + circle_a;  //4 x
                             yC = circle_compare[3];
-                            for (; xC < k; xC++)
+                            for (; xC < k; xC += 1)
                                 outPutArray[yC][xC] = 1;
                         }
                     }
@@ -1108,7 +956,7 @@ void view_rectangle(
                             xC = circle_localCentre[0][0] - circle_b; //7 x
                             k = circle_localCentre[1][0] + circle_b;  //2 x
                             yC = circle_compare[1];
-                            for (; xC < k; xC++)
+                            for (; xC < k; xC += 1)
                                 outPutArray[yC][xC] = 1;
                         }
                         if (circle_localCentre[3][1] + circle_a > circle_compare[2]) //3, 6  y
@@ -1118,7 +966,7 @@ void view_rectangle(
                             xC = circle_localCentre[2][0] - circle_b; //6 x
                             k = circle_localCentre[3][0] + circle_b;  //3 x
                             yC = circle_compare[2];
-                            for (; xC <= k; xC++)
+                            for (; xC <= k; xC += 1)
                                 outPutArray[yC][xC] = 1;
                         }
                     }
@@ -1137,70 +985,48 @@ void view_rectangle(
         }
     }
     //输出
-    if (alpha)
+    for (i = 0, yC = yS; i < ySize; i++, yC += 1)
     {
-        for (i = 0, yC = yS; i < ySize; i++, yC++)
+        if (yC < minY || yC > maxY)
+            continue;
+        for (j = 0, xC = xS; j < xSize; j++, xC += 1)
         {
-            if (yC < minY || yC > maxY)
+            if (xC < minX || xC > maxX)
                 continue;
-            for (j = 0, xC = xS; j < xSize; j++, xC++)
-            {
-                if (xC < minX || xC > maxX)
-                    continue;
-                else if (outPutArray[i][j])
-                    print_dot2(xC, yC, color, alpha);
-            }
-        }
-    }
-    else
-    {
-        for (i = 0, yC = yS; i < ySize; i++, yC++)
-        {
-            if (yC < minY || yC > maxY)
-                continue;
-            for (j = 0, xC = xS; j < xSize; j++, xC++)
-            {
-                if (xC < minX || xC > maxX)
-                    continue;
-                else if (outPutArray[i][j])
-                    print_dot(xC, yC, color);
-            }
+            else if (outPutArray[i][j])
+                print_dot(xC, yC, color);
         }
     }
 
-    for (i = 0; i < ySize; i++)
+    for (i = 0; i < ySize; i += 1)
         free(outPutArray[i]);
     free(outPutArray);
 }
 
 /*
- *  用rgb数据填充矩形
+ *  用pic(BGRA格式)数据填充矩形
  */
 void view_rectangle_padding(
-    uint8_t *pic,
+    uint32_t *pic,
     int xStart, int yStart,
     int xEnd, int yEnd,
     int picWidth, int picHeight,
-    int picPB,
-    bool picUseReplaceColor,
-    int picReplaceColor,
-    int picReplaceColorBy,
-    bool picUseInvisibleColor,
-    int picInvisibleColor,
-    int alpha,
+    bool useReplaceColor,
+    uint32_t replaceColor,
+    uint32_t replaceColorBy,
     int xMin, int yMin,
     int xMax, int yMax)
 {
+    //目标输出矩阵范围
     int xS = xStart, yS = yStart, xE = xEnd, yE = yEnd;
+    //输出矩阵横纵计数
     int xC, yC, temp;
+    //图片像素纵计数
+    int yPic;
+    //图片像素横纵浮点计数以及分度值
+    float xStep, yStep, xDiv, yDiv;
 
-    uint8_t replaceColor[3] = {0};
-    uint8_t invisibleColor[3] = {0};
-
-    int xPC, yPC;
-    float xPPC, yPPC, xCVal, yCVal;
-
-    uint8_t *charP;
+    uint32_t color;
 
     if (!pic)
         return;
@@ -1234,236 +1060,31 @@ void view_rectangle_padding(
     yE += 1;
     xE += 1;
 
-    xCVal = (float)picWidth / (xE - xS);
-    yCVal = (float)picHeight / (yE - yS);
+    xDiv = (float)picWidth / (xE - xS);
+    yDiv = (float)picHeight / (yE - yS);
 
-    if (picUseReplaceColor)
+    for (yC = yS, yPic = 0, yStep = 0; yC < yE; yC++, yStep += yDiv)
     {
-        replaceColor[0] = (picReplaceColor >> 16) & 0xFF;
-        replaceColor[1] = (picReplaceColor >> 8) & 0xFF;
-        replaceColor[2] = picReplaceColor & 0xFF;
-    }
-    if (picUseInvisibleColor)
-    {
-        invisibleColor[0] = (picInvisibleColor >> 16) & 0xFF;
-        invisibleColor[1] = (picInvisibleColor >> 8) & 0xFF;
-        invisibleColor[2] = picInvisibleColor & 0xFF;
-    }
+        //范围检查
+        if (yC < yMin)
+            continue;
+        else if (yC > yMax)
+            break;
 
-    if (alpha == 0)
-    {
-        for (yC = yS, yPC = 0, yPPC = 0; yC < yE; yC++, yPPC += yCVal)
+        for (xC = xS, yPic = yStep, xStep = 0; xC < xE; xC++, xStep += xDiv)
         {
-            if (yC < yMin)
+            //范围检查
+            if (xC < xMin)
                 continue;
-            else if (yC > yMax)
+            else if (xC > xMax)
                 break;
 
-            for (xC = xS, yPC = yPPC, xPC = 0, xPPC = 0; xC < xE; xC++, xPPC += xCVal)
-            {
-                if (xC < xMin)
-                    continue;
-                else if (xC > xMax)
-                    break;
+            color = pic[yPic * picWidth + (int)xStep];
 
-                xPC = xPPC;
-                charP = &pic[yPC * picWidth * picPB + xPC * picPB];
-
-                if (picUseReplaceColor &&
-                    charP[0] == replaceColor[0] &&
-                    charP[1] == replaceColor[1] &&
-                    charP[2] == replaceColor[2])
-                    print_dot(xC, yC, picReplaceColorBy);
-                else if (picUseInvisibleColor &&
-                         charP[0] == invisibleColor[0] &&
-                         charP[1] == invisibleColor[1] &&
-                         charP[2] == invisibleColor[2])
-                    ;
-                else
-                    print_dot(xC, yC, ((charP[0] << 16) | (charP[1] << 8) | charP[2]));
-            }
-        }
-    }
-    else
-    {
-        for (yC = yS, yPC = 0, yPPC = 0; yC < yE; yC++, yPPC += yCVal)
-        {
-            if (yC < yMin)
-                continue;
-            else if (yC > yMax)
-                break;
-
-            for (xC = xS, yPC = yPPC, xPC = 0, xPPC = 0; xC < xE; xC++, xPPC += xCVal)
-            {
-                if (xC < xMin)
-                    continue;
-                else if (xC > xMax)
-                    break;
-
-                xPC = xPPC;
-                charP = &pic[yPC * picWidth * picPB + xPC * picPB];
-
-                if (picUseReplaceColor &&
-                    charP[0] == replaceColor[0] &&
-                    charP[1] == replaceColor[1] &&
-                    charP[2] == replaceColor[2])
-                    print_dot(xC, yC, picReplaceColorBy);
-                else if (picUseInvisibleColor &&
-                         charP[0] == invisibleColor[0] &&
-                         charP[1] == invisibleColor[1] &&
-                         charP[2] == invisibleColor[2])
-                    ;
-                else
-                    print_dot2(xC, yC, ((charP[0] << 16) | (charP[1] << 8) | charP[2]), alpha);
-            }
-        }
-    }
-}
-
-/*
- *  功能: 画矩形并填充图片
- *  参数:
- *      pic : 图片数据
- *      xStart, yStart, xEnd, yEnd : 起止坐标
- *      pW : 像素字节数
- *  返回: 无
- */
-void view_rectangle_padding2(
-    uint8_t ***picMap,
-    int xStart, int yStart,
-    int xEnd, int yEnd,
-    int picWidth, int picHeight,
-    int picPB,
-    bool picUseReplaceColor,
-    int picReplaceColor,
-    int picReplaceColorBy,
-    bool picUseInvisibleColor,
-    int picInvisibleColor,
-    int alpha,
-    int xMin, int yMin,
-    int xMax, int yMax)
-{
-    int xS = xStart, yS = yStart, xE = xEnd, yE = yEnd;
-    int xC, yC, temp;
-
-    uint8_t replaceColor[3] = {0};
-    uint8_t invisibleColor[3] = {0};
-
-    int xPC, yPC;
-    float xPPC, yPPC, xCVal, yCVal;
-
-    if (!picMap)
-        return;
-
-    // 矩阵端点整理
-    if (xS > xE && yS <= yE) // 交换x坐标
-    {
-        temp = xS;
-        xS = xE;
-        xE = temp;
-    }
-    else if (yS > yE && xS <= xE) // 交换y坐标
-    {
-        temp = yS;
-        yS = yE;
-        yE = temp;
-    }
-    else if (yS > yE && xS > xE) // 交换x, y坐标
-    {
-        temp = xS;
-        xS = xE;
-        xE = temp;
-        temp = yS;
-        yS = yE;
-        yE = temp;
-    }
-    //完全超出绘制范围不绘制
-    if (xS > xMax || yS > yMax || xE < xMin || yE < yMin)
-        return;
-
-    yE += 1;
-    xE += 1;
-
-    xCVal = (float)picWidth / (xE - xS);
-    yCVal = (float)picHeight / (yE - yS);
-
-    if (picUseReplaceColor)
-    {
-        replaceColor[0] = (picReplaceColor >> 16) & 0xFF;
-        replaceColor[1] = (picReplaceColor >> 8) & 0xFF;
-        replaceColor[2] = picReplaceColor & 0xFF;
-    }
-    if (picUseInvisibleColor)
-    {
-        invisibleColor[0] = (picInvisibleColor >> 16) & 0xFF;
-        invisibleColor[1] = (picInvisibleColor >> 8) & 0xFF;
-        invisibleColor[2] = picInvisibleColor & 0xFF;
-    }
-
-    if (alpha == 0)
-    {
-        for (yC = yS, yPC = 0, yPPC = 0; yC < yE; yC++, yPPC += yCVal)
-        {
-            if (yC < yMin)
-                continue;
-            else if (yC > yMax)
-                break;
-
-            for (xC = xS, yPC = yPPC, xPC = 0, xPPC = 0; xC < xE; xC++, xPPC += xCVal)
-            {
-                if (xC < xMin)
-                    continue;
-                else if (xC > xMax)
-                    break;
-
-                xPC = xPPC;
-
-                if (picUseReplaceColor &&
-                    picMap[yPC][xPC][0] == replaceColor[0] &&
-                    picMap[yPC][xPC][1] == replaceColor[1] &&
-                    picMap[yPC][xPC][2] == replaceColor[2])
-                    print_dot(xC, yC, picReplaceColorBy);
-                else if (picUseInvisibleColor &&
-                         picMap[yPC][xPC][0] == invisibleColor[0] &&
-                         picMap[yPC][xPC][1] == invisibleColor[1] &&
-                         picMap[yPC][xPC][2] == invisibleColor[2])
-                    ;
-                else
-                    print_dot(xC, yC, ((picMap[yPC][xPC][0] << 16) | (picMap[yPC][xPC][1] << 8) | picMap[yPC][xPC][2]));
-            }
-        }
-    }
-    else
-    {
-        for (yC = yS, yPC = 0, yPPC = 0; yC < yE; yC++, yPPC += yCVal)
-        {
-            if (yC < yMin)
-                continue;
-            else if (yC > yMax)
-                break;
-
-            for (xC = xS, yPC = yPPC, xPC = 0, xPPC = 0; xC < xE; xC++, xPPC += xCVal)
-            {
-                if (xC < xMin)
-                    continue;
-                else if (xC > xMax)
-                    break;
-
-                xPC = xPPC;
-
-                if (picUseReplaceColor &&
-                    picMap[yPC][xPC][0] == replaceColor[0] &&
-                    picMap[yPC][xPC][1] == replaceColor[1] &&
-                    picMap[yPC][xPC][2] == replaceColor[2])
-                    print_dot2(xC, yC, picReplaceColorBy, alpha);
-                else if (picUseInvisibleColor &&
-                         picMap[yPC][xPC][0] == invisibleColor[0] &&
-                         picMap[yPC][xPC][1] == invisibleColor[1] &&
-                         picMap[yPC][xPC][2] == invisibleColor[2])
-                    ;
-                else
-                    print_dot2(xC, yC, ((picMap[yPC][xPC][0] << 16) | (picMap[yPC][xPC][1] << 8) | picMap[yPC][xPC][2]), alpha);
-            }
+            if (useReplaceColor && color == replaceColor)
+                print_dot(xC, yC, replaceColorBy);
+            else
+                print_dot(xC, yC, color);
         }
     }
 }
@@ -1474,19 +1095,17 @@ void view_rectangle_padding2(
  *  功能: 画平行四边形
  *  参数:
  *      color : 颜色
- *      xStart, yStart, xEnd, yEnd : 起止坐标   //平行四边形 左上 和 右下 的坐标
+ *      xStart, yStart, xEnd, yEnd : 起止坐标 //平行四边形 左上 和 右下 的坐标
  *      size : 线宽
  *      width : 平行四边形上边长度
- *      alpha : 0:实心填充  1:半透填充
  *      minY, maxY : 超出上下 Y 坐标部分不绘制
  *  返回: 无
  */
 void view_parallelogram(
-    int color,
+    uint32_t color,
     int xStart, int yStart,
     int xEnd, int yEnd,
     int size, int width,
-    int alpha,
     int minX, int minY,
     int maxX, int maxY)
 {
@@ -1559,36 +1178,21 @@ void view_parallelogram(
     else
         distance = delta_y;
 
-    for (t = 0; t <= distance + 1; t++) //画线输出
+    for (t = 0; t <= distance + 1; t += 1) //画线输出
     {
         // xCount, yCount
         if (yCount < minY || yCount > maxY)
             ;
         else
         {
-            if (alpha)
+            for (xC = xCount, yC = yCount; xC <= xCount + width; xC += 1)
             {
-                for (xC = xCount, yC = yCount; xC <= xCount + width; xC++)
-                {
-                    if (xC < minX || xC > maxX)
-                        continue;
-                    if (sSize == 0)
-                        print_dot2(xC, yC, color, alpha);
-                    else if (yC < yStart + sSize || xC < xCount + sSize || yC > yEnd2 - sSize || xC > xCount + width - sSize)
-                        print_dot2(xC, yC, color, alpha);
-                }
-            }
-            else
-            {
-                for (xC = xCount, yC = yCount; xC <= xCount + width; xC++)
-                {
-                    if (xC < minX || xC > maxX)
-                        continue;
-                    if (sSize == 0)
-                        print_dot(xC, yC, color);
-                    else if (yC < yStart + sSize || xC < xCount + sSize || yC > yEnd2 - sSize || xC > xCount + width - sSize)
-                        print_dot(xC, yC, color);
-                }
+                if (xC < minX || xC > maxX)
+                    continue;
+                if (sSize == 0)
+                    print_dot(xC, yC, color);
+                else if (yC < yStart + sSize || xC < xCount + sSize || yC > yEnd2 - sSize || xC > xCount + width - sSize)
+                    print_dot(xC, yC, color);
             }
         }
 
@@ -1610,31 +1214,17 @@ void view_parallelogram(
         ;
     else
     {
-        if (alpha)
+        for (xC = xEnd2, yC = yEnd2; xC <= xCount + width; xC += 1)
         {
-            for (xC = xEnd2, yC = yEnd2; xC <= xCount + width; xC++)
-            {
-                if (xC < minX || xC > maxX)
-                    continue;
-                if (sSize == 0)
-                    print_dot2(xC, yC, color, alpha);
-                else if (yC < yStart + sSize || xC < xCount + sSize ||
-                         yC > yEnd2 - sSize || xC > xCount + width - sSize)
-                    print_dot2(xC, yC, color, alpha);
-            }
-        }
-        else
-        {
-            for (xC = xEnd2, yC = yEnd2; xC <= xCount + width; xC++)
-            {
-                if (xC < minX || xC > maxX)
-                    continue;
-                if (sSize == 0)
-                    print_dot(xC, yC, color);
-                else if (yC < yStart + sSize || xC < xCount + sSize ||
-                         yC > yEnd2 - sSize || xC > xCount + width - sSize)
-                    print_dot(xC, yC, color);
-            }
+            if (xC < minX || xC > maxX)
+                continue;
+            if (sSize == 0)
+                print_dot(xC, yC, color);
+            else if (yC < yStart + sSize ||
+                     xC < xCount + sSize ||
+                     yC > yEnd2 - sSize ||
+                     xC > xCount + width - sSize)
+                print_dot(xC, yC, color);
         }
     }
 }
@@ -1642,77 +1232,13 @@ void view_parallelogram(
 //-------------------- 写字符串 --------------------
 
 /*
- *  根据 ttf_map 画点阵
- */
-void view_printBitMap(
-    int fColor, int bColor,
-    int xStart, int yStart,
-    Ttf_Map map)
-{
-    //总字节
-    int byteTotal = map.height * map.lineByte;
-    //总字节计数
-    int byteTotalCount;
-    //一行字节计数
-    int lineByteCount;
-    //画点用
-    uint8_t bit;
-    int i;
-    //横纵向点计数
-    int x = 0, y = 0;
-
-    int xLeft = xStart + map.bitLeft;
-    int yTop = yStart + map.bitTop;
-
-    int xEnd = xStart + map.width;
-    int yEnd = yStart + map.height;
-
-    //纵向起始跳过行数
-    for (y = yStart; y < yTop; y++)
-    {
-        for (x = xStart; x < xEnd; x++)
-            print_dot(x, y, bColor);
-    }
-    //正文
-    for (byteTotalCount = 0; byteTotalCount < byteTotal && y < yEnd; y++)
-    {
-        //横向起始跳过点数
-        for (x = xStart; x < xLeft; x++)
-            print_dot(x, y, bColor);
-        //正文
-        for (lineByteCount = 0; lineByteCount < map.lineByte; lineByteCount++, byteTotalCount++)
-        {
-            //画一行的点(注意 map.lineByte 有盈余,需判断 x < xEnd 保证不多画)
-            for (i = 0, bit = map.bitMap[byteTotalCount]; i < 8 && x < xEnd; i++, x++)
-            {
-                if (bit & 0x80)
-                    print_dot(x, y, fColor);
-                else
-                    print_dot(x, y, bColor);
-                bit <<= 1;
-            }
-        }
-        //横向补足点数
-        for (; x < xEnd; x++)
-            print_dot(x, y, bColor);
-    }
-    //纵向补足行数
-    for (; y < yEnd; y++)
-    {
-        for (x = xStart; x < xEnd; x++)
-            print_dot(x, y, bColor);
-    }
-}
-
-/*
  *  根据 ttf_map 画点阵,增加范围限制和透明度参数
  */
-void view_printBitMap2(
-    int fColor, int bColor,
+void view_printBitMap(
+    uint32_t fColor, uint32_t bColor,
     int xStart, int yStart,
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
-    int alpha,
     Ttf_Map map)
 {
     //总字节
@@ -1726,47 +1252,42 @@ void view_printBitMap2(
     int i;
     //横纵向点计数
     int x = 0, y = 0;
-
-    int xLeft = xStart + map.bitLeft;
-    int yTop = yStart + map.bitTop;
-
-    int xEnd = xStart + map.width;
-    int yEnd = yStart + map.height;
+    int xp, yp;
 
     //纵向起始跳过行数
-    for (y = yStart; y < yTop; y++)
+    for (y = 0, yp = yStart; y < map.bitTop; y += 1, yp += 1)
     {
-        for (x = xStart; x < xEnd; x++)
-            print_dot2(x, y, bColor, alpha);
+        for (x = 0, xp = xStart; x < map.width; x++, xp += 1)
+            print_dot(xp, yp, bColor);
     }
     //正文
-    for (byteTotalCount = 0; byteTotalCount < byteTotal && y < yEnd; y++)
+    for (byteTotalCount = 0, yp = y + yStart; byteTotalCount < byteTotal && y < map.height; y += 1, yp += 1)
     {
         //横向起始跳过点数
-        for (x = xStart; x < xLeft; x++)
-            print_dot(x, y, bColor);
+        for (x = 0, xp = xStart; x < map.bitLeft; x += 1, xp += 1)
+            print_dot(xp, yp, bColor);
         //正文
-        for (lineByteCount = 0; lineByteCount < map.lineByte; lineByteCount++, byteTotalCount++)
+        for (lineByteCount = 0; lineByteCount < map.lineByte; lineByteCount++, byteTotalCount += 1)
         {
-            //画一行的点(注意 map.lineByte 有盈余,需判断 x < xEnd 保证不多画)
-            for (i = 0, bit = map.bitMap[byteTotalCount]; i < 8 && x < xEnd; i++, x++)
+            //画一行的点(注意 map.lineByte 有盈余,需判断 x < map.width 保证不多画)
+            for (i = 0, bit = map.bitMap[byteTotalCount]; i < 8 && x < map.width; i++, x += 1)
             {
                 if (bit & 0x80)
-                    print_dot2(x, y, fColor, alpha);
+                    print_dot(x + xStart, y + yStart, fColor);
                 else
-                    print_dot(x, y, bColor);
+                    print_dot(x + xStart, y + yStart, bColor);
                 bit <<= 1;
             }
         }
         //横向补足点数
-        for (; x < xEnd; x++)
-            print_dot(x, y, bColor);
+        for (x = 0, xp = xStart; x < map.bitLeft; x += 1, xp += 1)
+            print_dot(xp, yp, bColor);
     }
     //纵向补足行数
-    for (; y < yEnd; y++)
+    for (yp = y + yStart; y < map.height; y += 1, yp += 1)
     {
-        for (x = xStart; x < xEnd; x++)
-            print_dot(x, y, bColor);
+        for (x = 0, xp = xStart; x < map.width; x++, xp += 1)
+            print_dot(xp, yp, bColor);
     }
 }
 
@@ -1781,7 +1302,11 @@ void view_printBitMap2(
  *      space : 字符间隔, 正常输出为0
  *  返回: 无
  */
-void view_string(int fColor, int bColor, char *str, int xStart, int yStart, int type, int space)
+void view_string(
+    uint32_t fColor, uint32_t bColor,
+    char *str,
+    int xStart, int yStart,
+    int type, int space)
 {
 #if (MAKE_FREETYPE)
     int ret;
@@ -1794,7 +1319,7 @@ void view_string(int fColor, int bColor, char *str, int xStart, int yStart, int 
             str -= ret;
         else
         {
-            view_printBitMap(fColor, bColor, xStart, yStart, map);
+            view_printBitMap(fColor, bColor, xStart, yStart, 0, 0, VIEW_X_END, VIEW_Y_END, map);
             xStart += map.width + space;
             str += ret;
         }
@@ -1812,17 +1337,16 @@ void view_string(int fColor, int bColor, char *str, int xStart, int yStart, int 
  *      strWidth, strHight : 相对左上角定位坐标, 限制宽, 高的矩阵内输出字符串
  *      type : 字体, 例如 160, 240, 320, 400, 480, 560, 640, 前两位标识像素尺寸, 后1位表示字体
  *      space : 字符间隔, 正常输出为0
- *      alpha : 0 正常打印, 1 半透打印
  *  返回: 无
  */
 void view_string_rectangle(
-    int fColor, int bColor,
+    uint32_t fColor, uint32_t bColor,
     char *str,
     int xStart, int yStart,
     int strWidth, int strHight,
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
-    int type, int space, int alpha)
+    int type, int space)
 {
 #if (MAKE_FREETYPE)
     int ret;
@@ -1841,12 +1365,11 @@ void view_string_rectangle(
             str -= ret;
         else
         {
-            view_printBitMap2(
+            view_printBitMap(
                 fColor, bColor,
                 xStart, yStart,
                 xScreenStart, yScreenStart,
                 xScreenEnd, yScreenEnd,
-                alpha,
                 map);
             xStart += map.width + space;
             str += ret;
@@ -1865,14 +1388,13 @@ void view_string_rectangle(
  *      strWidth, strHight : 相对左上角定位坐标, 限制宽, 高的矩阵内输出字符串
  *      type : 字体, 例如 160, 240, 320, 400, 480, 560, 640, 前两位标识像素尺寸, 后1位表示字体
  *      xSpace, ySpace : 字符间隔, 正常输出为0
- *      alpha : 0 正常打印, 1 半透打印
  *      lineSpace : 上下行间隔
  *      retWordPerLine : 传入记录每行占用字节数的数组指针, 不用可置NULL
  *      retLine : 传入记录占用行数的指针, 不用可置NULL
  * 返回: 成功输出的字符数
  */
 int view_string_rectangleLineWrap(
-    int fColor, int bColor,
+    uint32_t fColor, uint32_t bColor,
     char *str,
     int xStart, int yStart,
     int strWidth, int strHight,
@@ -1880,7 +1402,6 @@ int view_string_rectangleLineWrap(
     int xScreenEnd, int yScreenEnd,
     int type,
     int xSpace, int ySpace,
-    int alpha,
     int *retWordPerLine,
     int *retLine)
 {
@@ -1910,13 +1431,14 @@ int view_string_rectangleLineWrap(
             {
                 xC += (typeWidth + xSpace) * 2;
                 str += 1;
-                //
-                if (*str == 0 && rwpl) //返回前记得先保存行占用字节数
+                //返回前记得先保存行占用字节数
+                if (*str == 0 && rwpl)
                     *rwpl = str - strOld;
             }
             else if (*str == '\n' || *str == '\r')
             {
-                yC += (typeHeight + ySpace); //换行
+                //换行
+                yC += (typeHeight + ySpace);
                 xC = xStart;
                 if (*str == '\r')
                     str += 2;
@@ -1925,15 +1447,18 @@ int view_string_rectangleLineWrap(
 
                 if (rl && yC < yE)
                     *rl += 1;
-                if (rwpl) //行占用字节数记录
+                //行占用字节数记录
+                if (rwpl)
                 {
-                    *rwpl = str - strOld; //计算偏移量得到一行字节数
+                    //计算偏移量得到一行字节数
+                    *rwpl = str - strOld;
                     rwpl += 1;
-                    strOld = str; //更新偏移指针
+                    //更新偏移指针
+                    strOld = str;
                 }
             }
 
-            if (str == 0 || yC > yE)
+            if (*str == 0 || yC > yE)
                 return (str - strStart);
         }
         ret = ttf_getMapByUtf8(ViewTTF, str, type, &map);
@@ -1957,12 +1482,11 @@ int view_string_rectangleLineWrap(
                 if (yC > yE)
                     break;
             }
-            view_printBitMap2(
+            view_printBitMap(
                 fColor, bColor,
                 xC, yC,
                 xScreenStart, yScreenStart,
                 xScreenEnd, yScreenEnd,
-                alpha,
                 map);
             xC += map.width + xSpace;
             str += ret;
@@ -1993,14 +1517,14 @@ int view_string_rectangleLineWrap(
  * 返回: 返回此次绘制的偏差值, 以便后续无缝衔接
  */
 int view_string_rectangleCR(
-    int fColor, int bColor,
+    uint32_t fColor, uint32_t bColor,
     char *str,
     int xStart, int yStart,
     int strWidth, int strHight,
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
     int type, int space,
-    int xErr, int alpha)
+    int xErr)
 {
 #if (MAKE_FREETYPE)
     int xMov = xErr, typeHeight = type / 10;
@@ -2022,12 +1546,11 @@ int view_string_rectangleCR(
         else
         {
             if (xMov + map.width > 0)
-                view_printBitMap2(
+                view_printBitMap(
                     fColor, bColor,
                     xStart + xMov, yStart,
                     xScreenStart, yScreenStart,
                     xScreenEnd, yScreenEnd,
-                    alpha,
                     map);
             xMov += map.width + space;
             strCount += ret;
@@ -2037,9 +1560,10 @@ int view_string_rectangleCR(
         {
             //自动填充空格分开字符串
             xMov += (typeHeight + space);
-
-            if (xMov <= 0)     //字符串遍历完还未抵达开始绘制的位置
-                retVal = xMov; //返回此次绘制的偏差值, 以便后续无缝衔接
+            //字符串遍历完还未抵达开始绘制的位置
+            if (xMov <= 0)
+                //返回此次绘制的偏差值, 以便后续无缝衔接
+                retVal = xMov;
             strCount = 0;
         }
     }
@@ -2049,7 +1573,7 @@ int view_string_rectangleCR(
 #endif
 }
 
-//--------------------  viewTool add/insert/remove --------------------
+//--------------------  链表操作 --------------------
 
 /*
  *  把 view 添加到 parentView 的子view链表
@@ -2302,7 +1826,7 @@ View_Struct *view_num(View_Struct *view, int n)
 
 //--------------------  viewTool focus --------------------
 
-View_Focus *view_focusInit(View_Struct *topView, View_Struct *cView, ViewValue_Format *color)
+View_Focus *view_focusInit(View_Struct *topView, View_Struct *cView, uint32_t color)
 {
     View_Focus *focus;
     if (topView)
@@ -2311,7 +1835,6 @@ View_Focus *view_focusInit(View_Struct *topView, View_Struct *cView, ViewValue_F
         focus->topView = topView;
         focus->color = color;
         focus->lineSize = 3;
-        focus->alpha = 0;
         view_focusNote(focus, cView);
         return focus;
     }
@@ -2623,7 +2146,7 @@ void _viewTool_viewLocal(char drawSync, View_Struct *view, int width, int height
             _viewTool_viewLocal(drawSync, rView, width, height, xy);
     }
 
-    if (view->centerHor)
+    if (view->centerX)
     {
         view->absXY[0][0] = xy[0][0] + (width - view->absWidth) / 2 - 1;
         view->absXY[1][0] = xy[0][0] + (width + view->absWidth) / 2 - 1;
@@ -2662,7 +2185,7 @@ void _viewTool_viewLocal(char drawSync, View_Struct *view, int width, int height
         view->absXY[1][0] = view->absXY[0][0] + view->absWidth - 1;
     }
 
-    if (view->centerVer)
+    if (view->centerY)
     {
         view->absXY[0][1] = xy[0][1] + (height - view->absHeight) / 2 - 1;
         view->absXY[1][1] = xy[0][1] + (height + view->absHeight) / 2 - 1;
@@ -2738,7 +2261,7 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             vps->valueOutput = (char *)calloc(value->vSize / sizeof(bool) * 8, sizeof(char));
             break;
         case VT_STRING_ARRAY:
-            for (i = 0, count = 0; i < value->vSize / sizeof(char *); i++)
+            for (i = 0, count = 0; i < value->vSize / sizeof(char *); i += 1)
                 count += strlen(value->value.StringArray[i]) + 1;
             vps->valueOutputLen = count;
             vps->valueOutput = (char *)calloc(count, sizeof(char));
@@ -2772,7 +2295,7 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             strDemoIntArray[4] = value->param[0]; //指定分隔符
         if (value->param[1])
             strDemoIntArray[2] = (value->param[1] % 10) + '0'; //指定高位补0数量
-        for (i = 0, count = 0; i < value->vSize / sizeof(int); i++)
+        for (i = 0, count = 0; i < value->vSize / sizeof(int); i += 1)
         {
             ret = sprintf(&vps->valueOutput[count], strDemoIntArray, value->value.IntArray[i]);
             count += ret;
@@ -2786,7 +2309,7 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             strDemoDoubleArray[5] = value->param[0]; //指定分隔符
         if (value->param[1])
             strDemoDoubleArray[2] = (value->param[1] % 10) + '0'; //指定保留小数位数
-        for (i = 0, count = 0; i < value->vSize / sizeof(double); i++)
+        for (i = 0, count = 0; i < value->vSize / sizeof(double); i += 1)
         {
             ret = sprintf(&vps->valueOutput[count], strDemoDoubleArray, value->value.DoubleArray[i]);
             count += ret;
@@ -2798,7 +2321,7 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
     case VT_BOOL_ARRAY:
         if (value->param[0] && value->param[0] != '%')
             strDemoStrArray[2] = value->param[0]; //指定分隔符
-        for (i = 0, count = 0; i < value->vSize / sizeof(bool); i++)
+        for (i = 0, count = 0; i < value->vSize / sizeof(bool); i += 1)
         {
             ret = sprintf(&vps->valueOutput[count], strDemoStrArray, value->value.BoolArray[i] ? "true" : "false");
             count += ret;
@@ -2810,14 +2333,14 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
     case VT_STRING_ARRAY:
         if (value->param[0] && value->param[0] != '%')
             strDemoStrArray[2] = value->param[0]; //指定分隔符
-        for (i = 0, count = 0; i < value->vSize / sizeof(char *); i++)
+        for (i = 0, count = 0; i < value->vSize / sizeof(char *); i += 1)
             count += strlen(value->value.StringArray[i]) + 1;
         if (count > vps->valueOutputLen)
         {
             free(vps->valueOutput);
             vps->valueOutput = (char *)calloc(count, sizeof(char));
         }
-        for (i = 0, count = 0; i < value->vSize / sizeof(char *); i++)
+        for (i = 0, count = 0; i < value->vSize / sizeof(char *); i += 1)
         {
             ret = sprintf(&vps->valueOutput[count], strDemoStrArray, value->value.StringArray[i]);
             count += ret;
@@ -2834,23 +2357,19 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
 }
 
 //控件锁定(失能)时的颜色处理
-static int _viewTool_lockColor(int color)
+static uint32_t _viewTool_lockColor(uint32_t color)
 {
-    uint8_t R = ((color & 0xFF0000) >> 16);
-    uint8_t G = ((color & 0x00FF00) >> 8);
-    uint8_t B = (color & 0x0000FF);
-
-    R = (R + 0xFF) >> 1;
-    G = (G + 0xFF) >> 1;
-    B = (B + 0xFF) >> 1;
-
-    return ((R << 16) | (G << 8) | B);
+    uint8_t *p = (uint8_t *)&color;
+    p[0] >>= 1;
+    p[1] >>= 1;
+    p[2] >>= 1;
+    return *((uint32_t *)p);
 }
 
 void _view_draw(View_Struct *view, int xyLimit[2][2])
 {
     int widthTemp = 0, heightTemp = 0;
-    int colorTemp = 0, colorTemp2 = 0;
+    uint32_t colorTemp = 0, colorTemp2 = 0;
 
     int absXYTemp[2][2] = {{0, 0}, {0, 0}};
     int intTemp = 0, intTemp2 = 0, intTemp3 = 0, intTemp4 = 0;
@@ -2870,10 +2389,10 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
     if (view->backGroundColor)
     {
         view_rectangle(
-            view->backGroundColor->value.Int,
+            view->backGroundColor,
             view->absXY[0][0], view->absXY[0][1],
             view->absXY[1][0], view->absXY[1][1],
-            0, view->backGroundRad, view->backGroundAlpha,
+            0, view->backGroundRad,
             xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
     }
     //形状绘制
@@ -2886,22 +2405,16 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
     if (view->shapeColorPrint)
     {
         if (view->lock)
-            colorTemp = _viewTool_lockColor(view->shapeColorPrint->value.Int);
-        // colorTemp = (((view->shapeColorPrint->value.Int&0xFF0000)>>1)&0xFF0000) |
-        //     (((view->shapeColorPrint->value.Int&0x00FF00)>>1)&0x00FF00) |
-        //     (((view->shapeColorPrint->value.Int&0x0000FF)>>1)&0x0000FF);
+            colorTemp = _viewTool_lockColor(view->shapeColorPrint);
         else
-            colorTemp = view->shapeColorPrint->value.Int;
+            colorTemp = view->shapeColorPrint;
     }
     if (view->shapeColorBackground)
     {
         if (view->lock)
-            colorTemp2 = _viewTool_lockColor(view->shapeColorBackground->value.Int);
-        // colorTemp2 = (((view->shapeColorBackground->value.Int&0xFF0000)>>1)&0xFF0000) |
-        //     (((view->shapeColorBackground->value.Int&0x00FF00)>>1)&0x00FF00) |
-        //     (((view->shapeColorBackground->value.Int&0x0000FF)>>1)&0x0000FF);
+            colorTemp2 = _viewTool_lockColor(view->shapeColorBackground);
         else
-            colorTemp2 = view->shapeColorBackground->value.Int;
+            colorTemp2 = view->shapeColorBackground;
     }
     switch (view->shapeType)
     {
@@ -2910,13 +2423,13 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
             view_rectangle(colorTemp2,
                            view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                            view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
-                           0, view->shape.rect.rad, view->shapeAlpha,
+                           0, view->shape.rect.rad,
                            xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
         if (view->shapeColorPrint)
             view_rectangle(colorTemp,
                            view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                            view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
-                           view->shape.rect.lineSize, view->shape.rect.rad, view->shapeAlpha,
+                           view->shape.rect.lineSize, view->shape.rect.rad,
                            xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
         break;
     case VST_PARA:
@@ -2945,13 +2458,13 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     colorTemp2,
                     view->shapeAbsXY[0][0] + view->shape.para.lineSize + intTemp, view->shapeAbsXY[0][1] + view->shape.para.lineSize,
                     view->shapeAbsXY[1][0] - view->shape.para.lineSize + intTemp2, view->shapeAbsXY[1][1] - view->shape.para.lineSize,
-                    0, widthTemp - view->shape.para.lineSize * 2 + intTemp3, view->shapeAlpha,
+                    0, widthTemp - view->shape.para.lineSize * 2 + intTemp3,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             view_parallelogram(
                 colorTemp,
                 view->shapeAbsXY[0][0] + intTemp, view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0] + intTemp2, view->shapeAbsXY[1][1],
-                view->shape.para.lineSize, widthTemp + intTemp3, view->shapeAlpha,
+                view->shape.para.lineSize, widthTemp + intTemp3,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
         }
         break;
@@ -3009,7 +2522,7 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
             view_line(
                 colorTemp,
                 absXYTemp[0][0], absXYTemp[0][1], absXYTemp[1][0], absXYTemp[1][1],
-                view->shape.line.lineSize, view->shape.line.space, view->shapeAlpha);
+                view->shape.line.lineSize, view->shape.line.space);
         }
         break;
     case VST_CIRCLE:
@@ -3026,7 +2539,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                         view->shapeAbsXY[0][1] + heightTemp / 2 - 1,
                         view->shape.circle.rad2,
                         view->shape.circle.rad2,
-                        view->shapeAlpha,
                         xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 view_circle(
                     colorTemp,
@@ -3034,7 +2546,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     view->shapeAbsXY[0][1] + heightTemp / 2 - 1,
                     view->shape.circle.rad,
                     view->shape.circle.rad - view->shape.circle.rad2,
-                    view->shapeAlpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             }
             //分段圆环
@@ -3048,7 +2559,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                         view->shapeAbsXY[0][1] + heightTemp / 2 - 1,
                         view->shape.circle.rad,
                         view->shape.circle.rad - view->shape.circle.rad2,
-                        view->shapeAlpha,
                         xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 view_circleLoop(
                     colorTemp,
@@ -3108,7 +2618,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                 view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
                 view->shape.processBar.lineSize,
                 view->shape.processBar.rad,
-                view->shapeAlpha,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
         }
         if (view->shapeColorBackground && view->shape.processBar.percent > 0)
@@ -3133,7 +2642,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     absXYTemp[1][1],
                     0,
                     view->shape.processBar.rad - view->shape.processBar.edge,
-                    view->shapeAlpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case 2: //从下到上
@@ -3145,7 +2653,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     absXYTemp[1][1],
                     0,
                     view->shape.processBar.rad - view->shape.processBar.edge,
-                    view->shapeAlpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case 1: //从右到左
@@ -3157,7 +2664,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     absXYTemp[1][1],
                     0,
                     view->shape.processBar.rad - view->shape.processBar.edge,
-                    view->shapeAlpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case 3: //从上到下
@@ -3169,7 +2675,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     absXYTemp[0][1] + (absXYTemp[1][1] - absXYTemp[0][1]) * view->shape.processBar.percent / 100,
                     0,
                     view->shape.processBar.rad - view->shape.processBar.edge,
-                    view->shapeAlpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case 4: //左右同时缩进
@@ -3181,7 +2686,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     absXYTemp[1][1],
                     0,
                     view->shape.processBar.rad - view->shape.processBar.edge,
-                    view->shapeAlpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case 5: //上下同时缩进
@@ -3193,7 +2697,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     absXYTemp[1][1] - (absXYTemp[1][1] - absXYTemp[0][1]) * (100 - view->shape.processBar.percent) / 100 / 2,
                     0,
                     view->shape.processBar.rad - view->shape.processBar.edge,
-                    view->shapeAlpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case 6: //上下左右同时缩进
@@ -3205,7 +2708,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     absXYTemp[1][1] - (absXYTemp[1][1] - absXYTemp[0][1]) * (100 - view->shape.processBar.percent) / 100 / 2,
                     0,
                     view->shape.processBar.rad - view->shape.processBar.edge,
-                    view->shapeAlpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             }
         }
@@ -3217,7 +2719,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                 view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
                 view->shape.processBar.lineSize,
                 view->shape.processBar.rad,
-                view->shapeAlpha,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
         }
         break;
@@ -3227,7 +2728,7 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                 colorTemp,
                 view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
-                view->shape.scrollBar.lineSize, view->shape.scrollBar.rad, view->shapeAlpha,
+                view->shape.scrollBar.lineSize, view->shape.scrollBar.rad,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
         if (view->shapeColorBackground && view->shape.scrollBar.percentOfTotal > 0)
         {
@@ -3242,7 +2743,7 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     view->shapeAbsXY[0][1],
                     view->shapeAbsXY[0][0] + intTemp2 + intTemp - 1,
                     view->shapeAbsXY[1][1],
-                    0, view->shape.scrollBar.rad, view->shapeAlpha,
+                    0, view->shape.scrollBar.rad,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case 1: //上下
@@ -3254,7 +2755,7 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     view->shapeAbsXY[0][1] + intTemp2 - 1,
                     view->shapeAbsXY[1][0],
                     view->shapeAbsXY[0][1] + intTemp2 + intTemp - 1,
-                    0, view->shape.scrollBar.rad, view->shapeAlpha,
+                    0, view->shape.scrollBar.rad,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             }
@@ -3270,43 +2771,43 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                 colorTemp,
                 view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
-                view->shape.sw.lineSize, view->shape.sw.rad, view->shapeAlpha,
+                view->shape.sw.lineSize, view->shape.sw.rad,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
         if (view->shape.sw.status) //开
         {
             view_rectangle(
-                ViewColor.Green.value.Int,
+                ViewColor.Green,
                 view->shapeAbsXY[1][0] - widthTemp / 2,
                 view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0],
                 view->shapeAbsXY[1][1],
-                0, view->shape.sw.rad, view->shapeAlpha,
+                0, view->shape.sw.rad,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             view_string_rectangle(
-                ViewColor.Content.value.Int, -1, "开",
+                ViewColor.Content, -1, "开",
                 view->shapeAbsXY[0][0] + widthTemp / 4 - intTemp / 2,
                 view->shapeAbsXY[0][1] + heightTemp / 2 - intTemp / 2,
                 intTemp, intTemp,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1],
-                view->shape.sw.printType, 0, view->shapeAlpha);
+                view->shape.sw.printType, 0);
         }
         else //关
         {
             view_rectangle(
-                ViewColor.Red.value.Int,
+                ViewColor.Red,
                 view->shapeAbsXY[0][0],
                 view->shapeAbsXY[0][1],
                 view->shapeAbsXY[0][0] + widthTemp / 2,
                 view->shapeAbsXY[1][1],
-                0, view->shape.sw.rad, view->shapeAlpha,
+                0, view->shape.sw.rad,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             view_string_rectangle(
-                ViewColor.Content.value.Int, -1, "关",
+                ViewColor.Content, -1, "关",
                 view->shapeAbsXY[1][0] - widthTemp / 4 - intTemp / 4 * 3,
                 view->shapeAbsXY[1][1] - heightTemp / 2 - intTemp / 2,
                 intTemp, intTemp,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1],
-                view->shape.sw.printType, 0, view->shapeAlpha);
+                view->shape.sw.printType, 0);
         }
         //框
         if (view->shapeColorPrint && view->shape.sw.lineSize)
@@ -3314,7 +2815,7 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                 colorTemp,
                 view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
-                view->shape.sw.lineSize, view->shape.sw.rad, view->shapeAlpha,
+                view->shape.sw.lineSize, view->shape.sw.rad,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
         break;
     default:
@@ -3325,24 +2826,19 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
     if (view->picPath)
     {
         //获取图片数据
-        if (view->picPath_bak != view->picPath)
+        if (view->picPathBakup != view->picPath)
         {
             //释放现在的内存
-            if (view->picMap)
-                picMap_release(view->picMap, view->picWidth, view->picHeight);
             if (view->pic)
                 free(view->pic);
             //读取新图片
-            view->pic = bmp_get(view->picPath, &view->picWidth, &view->picHeight, &view->picPB);
+            view->pic = view_getPic(view->picPath, &view->picWidth, &view->picHeight, &view->picPB);
             //获取指针网格
             if (view->pic)
-            {
-                view->picMap = picMap_init(&view->pic, view->picWidth, view->picHeight, &view->picPB);
-                view->picPath_bak = view->picPath;
-            }
+                view->picPathBakup = view->picPath;
             //找不到图片,下次不找了...
             else
-                view->picPath_bak = view->picPath = NULL;
+                view->picPathBakup = view->picPath = NULL;
         }
         //输出范围计算
         view->picAbsXY[0][0] = view->absXY[0][0] + view->picLeftEdge;
@@ -3351,24 +2847,20 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
         view->picAbsXY[1][1] = view->absXY[1][1] - view->picBottomEdge;
         //拉伸/缩放输出
         if (view->picUseReplaceColor && view->picReplaceColorBy)
-            view_rectangle_padding2(
-                view->picMap,
+            view_rectangle_padding(
+                view->pic,
                 view->picAbsXY[0][0], view->picAbsXY[0][1],
                 view->picAbsXY[1][0], view->picAbsXY[1][1],
-                view->picWidth, view->picHeight, view->picPB,
-                view->picUseReplaceColor, view->picReplaceColor, view->picReplaceColorBy->value.Int,
-                view->picUseInvisibleColor, view->picInvisibleColor,
-                view->picAlpha,
+                view->picWidth, view->picHeight,
+                view->picUseReplaceColor, view->picReplaceColor, view->picReplaceColorBy,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
         else
-            view_rectangle_padding2(
-                view->picMap,
+            view_rectangle_padding(
+                view->pic,
                 view->picAbsXY[0][0], view->picAbsXY[0][1],
                 view->picAbsXY[1][0], view->picAbsXY[1][1],
-                view->picWidth, view->picHeight, view->picPB,
+                view->picWidth, view->picHeight,
                 false, 0, 0,
-                view->picUseInvisibleColor, view->picInvisibleColor,
-                view->picAlpha,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
     }
 
@@ -3376,13 +2868,9 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
     if (view->value && view->valueColor)
     {
         if (view->lock)
-            colorTemp = _viewTool_lockColor(view->valueColor->value.Int);
-        // colorTemp = (((view->valueColor->value.Int&0xFF0000)>>1)&0xFF0000) |
-        //     (((view->valueColor->value.Int&0x00FF00)>>1)&0x00FF00) |
-        //     (((view->valueColor->value.Int&0x0000FF)>>1)&0x0000FF);
+            colorTemp = _viewTool_lockColor(view->valueColor);
         else
-            colorTemp = view->valueColor->value.Int;
-
+            colorTemp = view->valueColor;
         //指定输出指针 *valueOutput
         view->valueOutput = _viewTool_valuePrint(view->value, &view->valuePrint);
         //输出范围计算
@@ -3435,7 +2923,7 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     intTemp, intTemp2,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1],
                     view->valueType, view->valueXEdge, view->valueYEdge,
-                    view->valueAlpha, NULL, NULL);
+                    NULL, NULL);
             }
             else
             {
@@ -3477,7 +2965,7 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                         view->valueAbsXY[1][0] - view->valueAbsXY[0][0], intTemp2,
                         view->valueAbsXY[0][0], view->valueAbsXY[0][1], view->valueAbsXY[1][0], view->valueAbsXY[1][1],
                         view->valueType, view->valueXEdge,
-                        view->scrollCount, view->valueAlpha);
+                        view->scrollCount);
                     view->scrollCount2 += 1;
                     if (view->scrollCount2 >= view->scrollPeriod)
                     {
@@ -3505,7 +2993,7 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                         view->valueAbsXY[0][1],
                         intTemp, intTemp2,
                         xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1],
-                        view->valueType, view->valueXEdge, view->valueAlpha);
+                        view->valueType, view->valueXEdge);
                 }
             }
 #endif
@@ -3530,16 +3018,16 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
             //     intTemp2 = view->valueAbsXY[1][0];
             // //
             // view_line(
-            //     view->bottomLineColor->value.Int,
+            //     view->bottomLineColor,
             //     intTemp, view->valueAbsXY[1][1],
             //     intTemp2, view->valueAbsXY[1][1],
-            //     view->bottomLine, 0, view->bottomLineAlpha);
+            //     view->bottomLine, 0);
             //
             view_line(
-                view->bottomLineColor->value.Int,
+                view->bottomLineColor,
                 view->absXY[0][0], view->absXY[1][1],
                 view->absXY[1][0], view->absXY[1][1],
-                view->bottomLine, 0, view->bottomLineAlpha);
+                view->bottomLine, 0);
         }
     }
 
@@ -3550,34 +3038,34 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
         {
         case VST_RECT:
             view_rectangle(
-                view->sideColor->value.Int,
+                view->sideColor,
                 view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
-                view->side, view->shape.rect.rad, 0,
+                view->side, view->shape.rect.rad,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             break;
         case VST_PROGRESS_BAR:
             view_rectangle(
-                view->sideColor->value.Int,
+                view->sideColor,
                 view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
-                view->side, view->shape.processBar.rad, 0,
+                view->side, view->shape.processBar.rad,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             break;
         case VST_SCROLL_BAR:
             view_rectangle(
-                view->sideColor->value.Int,
+                view->sideColor,
                 view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
-                view->side, view->shape.scrollBar.rad, 0,
+                view->side, view->shape.scrollBar.rad,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             break;
         case VST_SWITCH:
             view_rectangle(
-                view->sideColor->value.Int,
+                view->sideColor,
                 view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
-                view->side, view->shape.sw.rad, 0,
+                view->side, view->shape.sw.rad,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             break;
         case VST_PARA:
@@ -3600,34 +3088,34 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                 intTemp3 = -view->shape.para.err;
             }
             view_parallelogram(
-                view->sideColor->value.Int,
+                view->sideColor,
                 view->shapeAbsXY[0][0] + intTemp, view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0] + intTemp2, view->shapeAbsXY[1][1],
-                view->side, widthTemp + intTemp3, 0,
+                view->side, widthTemp + intTemp3,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             break;
         case VST_CIRCLE:
             view_circle(
-                view->sideColor->value.Int,
+                view->sideColor,
                 view->shapeAbsXY[0][0] + widthTemp / 2 - 1,
                 view->shapeAbsXY[0][1] + heightTemp / 2 - 1,
-                view->shape.circle.rad, view->side, 0,
+                view->shape.circle.rad, view->side,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             break;
         case VST_SECTOR:
             view_circle(
-                view->sideColor->value.Int,
+                view->sideColor,
                 view->shapeAbsXY[0][0] + widthTemp / 2 - 1,
                 view->shapeAbsXY[0][1] + heightTemp / 2 - 1,
-                view->shape.sector.rad, view->side, 0,
+                view->shape.sector.rad, view->side,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             break;
         default:
             view_rectangle(
-                view->sideColor->value.Int,
+                view->sideColor,
                 view->absXY[0][0], view->absXY[0][1],
                 view->absXY[1][0], view->absXY[1][1],
-                view->side, 0, 0,
+                view->side, 0,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             break;
         }
@@ -3654,42 +3142,38 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
             {
             case VST_RECT:
                 view_rectangle(
-                    focus->color->value.Int,
+                    focus->color,
                     view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                     view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
                     focus->lineSize,
                     view->shape.rect.rad,
-                    focus->alpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case VST_PROGRESS_BAR:
                 view_rectangle(
-                    focus->color->value.Int,
+                    focus->color,
                     view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                     view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
                     focus->lineSize,
                     view->shape.processBar.rad,
-                    focus->alpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case VST_SCROLL_BAR:
                 view_rectangle(
-                    focus->color->value.Int,
+                    focus->color,
                     view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                     view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
                     focus->lineSize,
                     view->shape.scrollBar.rad,
-                    focus->alpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case VST_SWITCH:
                 view_rectangle(
-                    focus->color->value.Int,
+                    focus->color,
                     view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                     view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
                     focus->lineSize,
                     view->shape.sw.rad,
-                    focus->alpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case VST_PARA:
@@ -3712,42 +3196,38 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                     intTemp3 = -view->shape.para.err;
                 }
                 view_parallelogram(
-                    focus->color->value.Int,
+                    focus->color,
                     view->shapeAbsXY[0][0] + intTemp, view->shapeAbsXY[0][1],
                     view->shapeAbsXY[1][0] + intTemp2, view->shapeAbsXY[1][1],
                     focus->lineSize,
                     widthTemp + intTemp3,
-                    focus->alpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case VST_CIRCLE:
                 view_circle(
-                    focus->color->value.Int,
+                    focus->color,
                     view->shapeAbsXY[0][0] + widthTemp / 2 - 1,
                     view->shapeAbsXY[0][1] + heightTemp / 2 - 1,
                     view->shape.circle.rad,
                     focus->lineSize,
-                    focus->alpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             case VST_SECTOR:
                 view_circle(
-                    focus->color->value.Int,
+                    focus->color,
                     view->shapeAbsXY[0][0] + widthTemp / 2 - 1,
                     view->shapeAbsXY[0][1] + heightTemp / 2 - 1,
                     view->shape.sector.rad,
                     focus->lineSize,
-                    focus->alpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             default:
                 view_rectangle(
-                    focus->color->value.Int,
+                    focus->color,
                     view->absXY[0][0], view->absXY[0][1],
                     view->absXY[1][0], view->absXY[1][1],
                     focus->lineSize,
                     0,
-                    focus->alpha,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
                 break;
             }
@@ -4042,7 +3522,7 @@ int _input_comm_callBack(View_Struct *view, void *object, View_Focus *focus, Vie
     View_Struct *vsParent, *vsTemp;
     int movMax = 0;
     _InputBackup_Struct *ibs;
-    int alpha;
+    uint8_t alpha;
 
     // printf("-- FUN CALLBACK-- _input_comm_callBack : %d\r\n", event->move);
 
@@ -4095,24 +3575,25 @@ int _input_comm_callBack(View_Struct *view, void *object, View_Focus *focus, Vie
             //找到当前居中的 view
             vsCurr = view_num(vsParent->view, vsHead->number + (int)((-vsHead->rTopBottomErr) / (ibs->contentMinType + 4)));
             //透明度 字体 和 控件高度 调整
-            vsCurr->valueAlpha = 0;
             vsCurr->valueType = vsStandard->valueType;
             vsCurr->height = vsStandard->height;
             vsCurr->bottomLine = 2;
-            for (alpha = 0.2, vsTemp = vsCurr->last;
-                 vsTemp && vsTemp->number > 2 && alpha < 1;
-                 alpha += 0.2, vsTemp = vsTemp->last)
+            for (alpha = 15, vsTemp = vsCurr->last;
+                 vsTemp && vsTemp->number > 2 && alpha < 255;
+                 alpha += 60, vsTemp = vsTemp->last)
             {
-                vsTemp->valueAlpha = alpha;
+                vsTemp->valueColor &= 0xFFFFFF00;
+                vsTemp->valueColor |= alpha;
                 vsTemp->valueType = ibs->contentMinType * 10;
                 vsTemp->height = ibs->contentMinType + 4;
                 vsTemp->bottomLine = 0;
             }
-            for (alpha = 0.2, vsTemp = vsCurr->next;
-                 vsTemp && alpha < 1;
-                 alpha += 0.2, vsTemp = vsTemp->next)
+            for (alpha = 15, vsTemp = vsCurr->next;
+                 vsTemp && alpha < 255;
+                 alpha += 60, vsTemp = vsTemp->next)
             {
-                vsTemp->valueAlpha = alpha;
+                vsTemp->valueColor &= 0xFFFFFF00;
+                vsTemp->valueColor |= alpha;
                 vsTemp->valueType = ibs->contentMinType * 10;
                 vsTemp->height = ibs->contentMinType + 4;
                 vsTemp->bottomLine = 0;
@@ -4357,10 +3838,10 @@ int _input_list_callBack(View_Struct *view, void *object, View_Focus *focus, Vie
 void view_input_focusCallBackFront(View_Struct *view, View_Focus *focus, int xyLimit[2][2])
 {
     view_rectangle(
-        focus->color->value.Int,
+        focus->color,
         view->absXY[0][0], view->absXY[0][1],
         view->absXY[1][0], view->absXY[1][1],
-        0, 0, 0.7,
+        0, 0,
         xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
 }
 
@@ -4400,7 +3881,7 @@ int _input_list2_input_callBack(View_Struct *view, void *object, View_Focus *foc
                     vsTemp->rType = VRT_RIGHT;
                     vsTemp->value = viewValue_init(vsTemp->name, VT_CHAR, 1, VIEW_DEL_CHAR);
                     vsTemp->valueType = ibs->contentMinType * 10;
-                    vsTemp->valueColor = &ViewColor.Tips;
+                    vsTemp->valueColor = ViewColor.Tips;
                     vsTemp->bottomLineColor = focus->color;
                     vsTemp->focusStop = true;
                     vsTemp->callBack = (ViewCallBack)&_input_list2_callBack;
@@ -4448,7 +3929,7 @@ int _input_list2_callBack(View_Struct *view, void *object, View_Focus *focus, Vi
 int _input_viewStart(View_Struct *view, void *object, View_Focus *focus, ViewButtonTouch_Event *event)
 {
     View_Struct *vsFocus, *vsTemp;
-    int alpha;
+    uint8_t alpha;
     int valueType;
     _InputBackup_Struct *ibs;
 
@@ -4467,39 +3948,41 @@ int _input_viewStart(View_Struct *view, void *object, View_Focus *focus, ViewBut
                 //位置平移
                 view->view->next->next->rTopBottomErr = -(vsFocus->number - view->view->next->next->number) * (ibs->contentMinType + 4);
                 //透明度 字体 和 控件高度 调整
-                vsFocus->valueAlpha = 0;
+                vsFocus->valueColor |= 0xFF;
                 vsFocus->valueType = view->view->next->valueType;
                 vsFocus->height = view->view->next->height;
                 // ->last
-                for (alpha = 0.2, vsTemp = vsFocus->last;
-                     vsTemp && vsTemp->number > 2 && alpha < 1;
-                     alpha += 0.2, vsTemp = vsTemp->last)
+                for (alpha = 15, vsTemp = vsFocus->last;
+                     vsTemp && vsTemp->number > 2 && alpha < 255;
+                     alpha += 60, vsTemp = vsTemp->last)
                 {
-                    vsTemp->valueAlpha = alpha;
+                    vsTemp->valueColor &= 0xFFFFFF00;
+                    vsTemp->valueColor |= alpha;
                     vsTemp->valueType = valueType;
                     vsTemp->height = ibs->contentMinType + 4;
                     vsTemp->bottomLine = 0;
                 }
                 for (; vsTemp && vsTemp->number > 2; vsTemp = vsTemp->last)
                 {
-                    vsTemp->valueAlpha = 1;
+                    vsTemp->valueColor |= 0xFF;
                     vsTemp->valueType = valueType;
                     vsTemp->height = ibs->contentMinType + 4;
                     vsTemp->bottomLine = 0;
                 }
                 // ->next
-                for (alpha = 0.2, vsTemp = vsFocus->next;
-                     vsTemp && alpha < 1;
-                     alpha += 0.2, vsTemp = vsTemp->next)
+                for (alpha = 15, vsTemp = vsFocus->next;
+                     vsTemp && alpha < 255;
+                     alpha += 60, vsTemp = vsTemp->next)
                 {
-                    vsTemp->valueAlpha = alpha;
+                    vsTemp->valueColor &= 0xFFFFFF00;
+                    vsTemp->valueColor |= alpha;
                     vsTemp->valueType = valueType;
                     vsTemp->height = ibs->contentMinType + 4;
                     vsTemp->bottomLine = 0;
                 }
                 for (; vsTemp; vsTemp = vsTemp->next)
                 {
-                    vsTemp->valueAlpha = 1;
+                    vsTemp->valueColor |= 0xFF;
                     vsTemp->valueType = valueType;
                     vsTemp->height = ibs->contentMinType + 4;
                     vsTemp->bottomLine = 0;
@@ -4608,8 +4091,7 @@ void view_input(
     sprintf(vs->name, "_input_%d", backView->drawSync);
     // vs->rLeftRightErr = -vsParent->absXY[0][0];
     // vs->rTopBottomErr = -vsParent->absXY[0][1];
-    // vs->backGroundColor = &ViewColor.BackGround;//暗幕
-    vs->backGroundAlpha = 0;
+    // vs->backGroundColor = ViewColor.BackGround;//暗幕
     // vs->overDraw = true;
     vs->viewStart = (ViewCallBack)&_input_viewStart;
     // vs->viewEnd = (ViewCallBack)&_input_viewEnd;
@@ -4632,12 +4114,12 @@ void view_input(
         vsTemp->shapeType = VST_RECT;
         vsTemp->shape.rect.rad = rad;
         vsTemp->shape.rect.lineSize = lineSize;
-        vsTemp->shapeColorPrint = &ViewColor.Button;
+        vsTemp->shapeColorPrint = ViewColor.Button;
         vsTemp->shapeBottomEdge = 1;
         vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
         vsTemp->value = viewValue_init("_input_frameContent", VT_STRING, 1, label);
         vsTemp->valueType = contentType * 10;
-        vsTemp->valueColor = &ViewColor.Tips;
+        vsTemp->valueColor = ViewColor.Tips;
         vsTemp->valueTopEdge = vsTemp->valueBottomEdge = 5;
         vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 5; //四周保持5的间距
         vsTemp->valueYEdge = 6;                             //自动换行,行间距5
@@ -4692,12 +4174,12 @@ void view_input(
         vsTemp->shapeType = VST_RECT;
         vsTemp->shape.rect.rad = rad;
         // vsTemp->shape.rect.lineSize = lineSize;
-        vsTemp->shapeColorPrint = &ViewColor.Gray2;
+        vsTemp->shapeColorPrint = ViewColor.Gray;
         vsTemp->shapeTopEdge = vsTemp->shapeBottomEdge = 1;
         vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
         vsTemp->value = &ViewSrc.Api_Button_Cancel;
         vsTemp->valueType = contentType * 10;
-        vsTemp->valueColor = &ViewColor.ButtonValue;
+        vsTemp->valueColor = ViewColor.ButtonValue;
         vsTemp->focusStop = true;
         vsTemp->callBack = (ViewCallBack)&_input_returnOrCancel_callBack;
         vsTemp->enMoveEvent = true;
@@ -4713,12 +4195,12 @@ void view_input(
         vsTemp->shapeType = VST_RECT;
         vsTemp->shape.rect.rad = rad;
         // vsTemp->shape.rect.lineSize = lineSize;
-        vsTemp->shapeColorPrint = &ViewColor.Green3;
+        vsTemp->shapeColorPrint = ViewColor.Green;
         vsTemp->shapeTopEdge = vsTemp->shapeBottomEdge = 1;
         vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
         vsTemp->value = &ViewSrc.Api_Button_Enter;
         vsTemp->valueType = contentType * 10;
-        vsTemp->valueColor = &ViewColor.ButtonValue;
+        vsTemp->valueColor = ViewColor.ButtonValue;
         vsTemp->focusStop = true;
         vsTemp->callBack = (ViewCallBack)&_input_enter_callBack;
         vsTemp->enMoveEvent = true;
@@ -4741,12 +4223,12 @@ void view_input(
         vsTemp->shapeType = VST_RECT;
         vsTemp->shape.rect.rad = rad;
         vsTemp->shape.rect.lineSize = lineSize;
-        vsTemp->shapeColorPrint = &ViewColor.Button;
+        vsTemp->shapeColorPrint = ViewColor.Button;
         vsTemp->shapeBottomEdge = 1;
         vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
         vsTemp->value = viewValue_init("multiInput_label", VT_STRING, 1, label);
         vsTemp->valueType = labelType * 10;
-        vsTemp->valueColor = &ViewColor.Label;
+        vsTemp->valueColor = ViewColor.Label;
         vsTemp->valueTopEdge = lineSize * 2;
         vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 5; //左右保持5的间距
         vsTemp->valueVerType = 1;
@@ -4771,7 +4253,7 @@ void view_input(
                     count = 1;
                 }
 
-                for (; count < valueNum; count++)
+                for (; count < valueNum; count += 1)
                 {
                     if (count == retInt)
                         vvfArray[count] =
@@ -4788,7 +4270,7 @@ void view_input(
             if ((valueNum = candidate->vSize / sizeof(int)) > 0)
             {
                 vvfArray = (ViewValue_Format **)calloc(valueNum, sizeof(ViewValue_Format *));
-                for (count = 0; count < valueNum; count++)
+                for (count = 0; count < valueNum; count += 1)
                 {
                     if (count == retInt)
                         vvfArray[count] =
@@ -4805,7 +4287,7 @@ void view_input(
             if ((valueNum = candidate->vSize / sizeof(double)) > 0)
             {
                 vvfArray = (ViewValue_Format **)calloc(valueNum, sizeof(ViewValue_Format *));
-                for (count = 0; count < valueNum; count++)
+                for (count = 0; count < valueNum; count += 1)
                 {
                     if (count == retInt)
                         vvfArray[count] =
@@ -4824,7 +4306,7 @@ void view_input(
                 intTemp[0] = 0; //当前长度
                 intTemp[1] = 0; //最长
                 vvfArray = (ViewValue_Format **)calloc(valueNum, sizeof(ViewValue_Format *));
-                for (count = 0; count < valueNum; count++)
+                for (count = 0; count < valueNum; count += 1)
                 {
                     if (count == retInt)
                         vvfArray[count] =
@@ -4859,8 +4341,8 @@ void view_input(
         strcpy(vsTemp->name, "_input_contentMain");
         vsTemp->width = VWHT_MATCH;
         vsTemp->height = ibs->contentType2 + 4;
-        vsTemp->centerHor = true;
-        vsTemp->centerVer = true;
+        vsTemp->centerX = true;
+        vsTemp->centerY = true;
         vsTemp->valueType = ibs->contentType2 * 10;
         view_add(vs, vsTemp, false);
 
@@ -4876,9 +4358,8 @@ void view_input(
             // vsTemp->shape.rect.rad = rad;
             vsTemp->value = viewValue_copy(NULL, value);
             vsTemp->valueType = ibs->contentType2 * 10;
-            vsTemp->valueColor = &ViewColor.Tips;
+            vsTemp->valueColor = ViewColor.Tips;
             // vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 5;//左右保持5的间距
-            vsTemp->valueAlpha = 0;
             vsTemp->scroll = 4; //自动滚动
             vsTemp->bottomLineColor = focus->color;
             vsTemp->callBack = (ViewCallBack)&_input_list_callBack;
@@ -4892,7 +4373,7 @@ void view_input(
         //把候选项逐个添加到链表中
         if (vvfArray)
         {
-            for (count = 0; count < valueNum; count++)
+            for (count = 0; count < valueNum; count += 1)
             {
                 vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));
                 sprintf(vsTemp->name, "_input_content%d", count);
@@ -4923,18 +4404,17 @@ void view_input(
                     vsTemp->valueType = ibs->contentMinType * 10;
                 }
                 //透明度
+                vsTemp->valueColor &= 0xFFFFFF00;
                 if (count > retInt)
-                    vsTemp->valueAlpha = ((count - retInt > 4) ? 1 : ((count - retInt) * 0.2));
+                    vsTemp->valueColor |= (count - retInt > 4) ? 0xFF : ((count - retInt) * 60 + 15);
                 else if (count < retInt)
-                    vsTemp->valueAlpha = ((retInt - count > 4) ? 1 : ((retInt - count) * 0.2));
-                else
-                    vsTemp->valueAlpha = 0;
+                    vsTemp->valueColor |= (retInt - count > 4) ? 0xFF : ((retInt - count) * 60 + 15);
                 // vsTemp->shapeType = VST_RECT;
                 // vsTemp->shape.rect.rad = rad;
                 vsTemp->value = vvfArray[count];
                 vsTemp->value->param[0] = value->param[0];
                 vsTemp->value->param[1] = value->param[1];
-                vsTemp->valueColor = &ViewColor.Tips;
+                vsTemp->valueColor = ViewColor.Tips;
                 // vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 5;//左右保持5的间距
                 vsTemp->scroll = 4; //自动滚动
                 vsTemp->bottomLineColor = focus->color;
@@ -4967,11 +4447,11 @@ void view_input(
         vsTemp->shapeType = VST_RECT;
         vsTemp->shape.rect.rad = rad;
         vsTemp->shape.rect.lineSize = lineSize;
-        vsTemp->shapeColorPrint = &ViewColor.Button;
+        vsTemp->shapeColorPrint = ViewColor.Button;
         vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
         vsTemp->value = viewValue_init("multiInput_label", VT_STRING, 1, label);
         vsTemp->valueType = labelType * 10;
-        vsTemp->valueColor = &ViewColor.Label;
+        vsTemp->valueColor = ViewColor.Label;
         vsTemp->valueTopEdge = lineSize * 2;
         vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 5; //左右保持5的间距
         vsTemp->valueVerType = 1;
@@ -4989,12 +4469,12 @@ void view_input(
         vsTemp->shapeType = VST_RECT;
         vsTemp->shape.rect.rad = rad;
         // vsTemp->shape.rect.lineSize = lineSize;
-        vsTemp->shapeColorPrint = &ViewColor.Gray2;
+        vsTemp->shapeColorPrint = ViewColor.Gray;
         vsTemp->shapeTopEdge = vsTemp->shapeBottomEdge = 1;
         vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
         vsTemp->value = &ViewSrc.Api_Button_Cancel;
         vsTemp->valueType = contentType * 10;
-        vsTemp->valueColor = &ViewColor.ButtonValue;
+        vsTemp->valueColor = ViewColor.ButtonValue;
         vsTemp->focusStop = true;
         vsTemp->callBack = (ViewCallBack)&_input_returnOrCancel_callBack;
         vsTemp->enMoveEvent = true;
@@ -5006,8 +4486,8 @@ void view_input(
         strcpy(vsTemp->name, "_input_contentMain");
         vsTemp->width = ibs->contentType2 / 2 + 4;
         vsTemp->height = ibs->contentType2 + 4;
-        vsTemp->centerHor = true;
-        // vsTemp->centerVer = true;
+        vsTemp->centerX = true;
+        // vsTemp->centerY = true;
         vsTemp->rTopBottomErr = (156 - ibs->contentType2 + 4) / 2;
         vsTemp->value = viewValue_copy(NULL, candidate);
         vsTemp->valueType = ibs->contentType2 * 10;
@@ -5046,7 +4526,7 @@ void view_input(
             vsTemp->rNumber = VRNT_LAST;
             vsTemp->value = viewValue_init("_input_content0", VT_CHAR, 1, valueStringPoint[0]);
             vsTemp->valueType = ibs->contentType2 * 10;
-            vsTemp->valueColor = &ViewColor.Tips;
+            vsTemp->valueColor = ViewColor.Tips;
             vsTemp->bottomLineColor = focus->color;
             vsTemp->focusStop = true;
             vsTemp->callBack = (ViewCallBack)&_input_list2_callBack;
@@ -5054,7 +4534,7 @@ void view_input(
             vsTemp->enMoveEvent = true;
             view_add(vs, vsTemp, false);
 
-            for (count = 1; valueStringPoint[count]; count++)
+            for (count = 1; valueStringPoint[count]; count += 1)
             {
                 vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));
                 sprintf(vsTemp->name, "_input_content%d", count);
@@ -5064,7 +4544,7 @@ void view_input(
                 vsTemp->rType = VRT_RIGHT;
                 vsTemp->value = viewValue_init(vsTemp->name, VT_CHAR, 1, valueStringPoint[count]);
                 vsTemp->valueType = ibs->contentMinType * 10;
-                vsTemp->valueColor = &ViewColor.Tips;
+                vsTemp->valueColor = ViewColor.Tips;
                 vsTemp->bottomLineColor = focus->color;
                 vsTemp->focusStop = true;
                 vsTemp->callBack = (ViewCallBack)&_input_list2_callBack;
@@ -5085,7 +4565,7 @@ void view_input(
                 vsTemp->rType = VRT_RIGHT;
                 vsTemp->value = viewValue_init(vsTemp->name, VT_CHAR, 1, VIEW_DEL_CHAR);
                 vsTemp->valueType = ibs->contentMinType * 10;
-                vsTemp->valueColor = &ViewColor.Tips;
+                vsTemp->valueColor = ViewColor.Tips;
                 vsTemp->bottomLineColor = focus->color;
                 vsTemp->focusStop = true;
                 vsTemp->callBack = (ViewCallBack)&_input_list2_callBack;
@@ -5104,7 +4584,7 @@ void view_input(
             vsTemp->rNumber = VRNT_LAST;
             vsTemp->value = viewValue_init(vsTemp->name, VT_CHAR, 1, candidate->value.String[0]);
             vsTemp->valueType = ibs->contentType2 * 10;
-            vsTemp->valueColor = &ViewColor.Tips;
+            vsTemp->valueColor = ViewColor.Tips;
             vsTemp->bottomLineColor = focus->color;
             vsTemp->focusStop = true;
             vsTemp->callBack = (ViewCallBack)&_input_list2_callBack;
@@ -5122,12 +4602,12 @@ void view_input(
         vsTemp->shapeType = VST_RECT;
         vsTemp->shape.rect.rad = rad;
         // vsTemp->shape.rect.lineSize = lineSize;
-        vsTemp->shapeColorPrint = &ViewColor.Green3;
+        vsTemp->shapeColorPrint = ViewColor.Green;
         vsTemp->shapeTopEdge = vsTemp->shapeBottomEdge = 1;
         vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
         vsTemp->value = &ViewSrc.Api_Button_Enter;
         vsTemp->valueType = contentType * 10;
-        vsTemp->valueColor = &ViewColor.ButtonValue;
+        vsTemp->valueColor = ViewColor.ButtonValue;
         vsTemp->focusStop = true;
         vsTemp->callBack = (ViewCallBack)&_input_enter_callBack;
         vsTemp->enMoveEvent = true;
