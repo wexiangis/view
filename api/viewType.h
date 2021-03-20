@@ -1,6 +1,6 @@
 
-#ifndef __VIEWTYPE_H_
-#define __VIEWTYPE_H_
+#ifndef _VIEWTYPE_H_
+#define _VIEWTYPE_H_
 
 #include <stdio.h>
 #include <stdint.h>
@@ -352,8 +352,12 @@ typedef struct ViewStruct
 
     //背景颜色的颜色,绘制范围为 absXY[2][2]
     ViewValue_Format *backGroundColor;
-    int backGroundRad;     //圆角
-    float backGroundAlpha; //透明度 0~1 1表示完全透明
+
+    //圆角
+    int backGroundRad;
+
+    //透明度0~100,不透明~完全透明
+    int backGroundAlpha;
 
     //---------- 形状 ----------
 
@@ -374,8 +378,8 @@ typedef struct ViewStruct
     ViewValue_Format *shapeColorPrint;      //默认为打印色
     ViewValue_Format *shapeColorBackground; //默认为打底色
 
-    //透明度 0~1, 1表示完全透明
-    float shapeAlpha;
+    //透明度0~100,不透明~完全透明
+    int shapeAlpha;
 
     //---------- 图片 ----------
 
@@ -408,8 +412,8 @@ typedef struct ViewStruct
     bool picUseInvisibleColor; //启用透明色
     int picInvisibleColor;     //指定透明色
 
-    //透明度 0~1, 1表示完全透明
-    float picAlpha;
+    //透明度0~100,不透明~完全透明
+    int picAlpha;
 
     //---------- 内容 ----------
 
@@ -456,15 +460,17 @@ typedef struct ViewStruct
     //计数,满 scrollPeriod 时 scrollCount+1 [系统赋值]
     int scrollCount2;
 
-    //透明度 0~1, 1表示完全透明
-    float valueAlpha;
+    //透明度0~100,不透明~完全透明
+    int valueAlpha;
 
     //---------- 下划线 ----------
 
     //下划线 >0启用并表示线宽,与控件的 width 同长度
     int bottomLine;
     ViewValue_Format *bottomLineColor;
-    float bottomLineAlpha;
+
+    //透明度0~100,不透明~完全透明
+    int bottomLineAlpha;
 
     //---------- 描边 ---------- [主要用于 focus]
 
@@ -551,7 +557,7 @@ typedef struct ViewFocus
     View_Struct *view;       //当前view
     ViewValue_Format *color; //聚焦时绘制颜色
     int lineSize;
-    float alpha;
+    int alpha;
 } View_Focus;
 
 //========== 触屏事件 结构 ==========

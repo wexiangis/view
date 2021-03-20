@@ -10,11 +10,16 @@
 #endif
 
 // ===== T31平台对接 =====
-#if (MAKE_PLATFORM == PLATFORM_T31)
+#if(MAKE_PLATFORM == PLATFORM_T31)
 
-#define VIEW_X_SIZE 240
-#define VIEW_Y_SIZE 240
-#define VIEW_PB 3
+#include "t31_plat.h"
+
+#define VIEW_X_SIZE T31_X_SIZE
+#define VIEW_Y_SIZE T31_Y_SIZE
+#define VIEW_PB T31_PB
+
+#define VIEW_MAP_INIT() t31_map_init()
+#define VIEW_MAP_EN() t31_map_en()
 
 // ===== 通用fb平台对接 =====
 #else
@@ -25,14 +30,12 @@
 #define VIEW_Y_SIZE FB_Y_SIZE
 #define VIEW_PB FB_PB
 
-#define PLAT_INIT()                  fb_init()
-#define PRINT_DOT(x, y, rgb)         fb_print_dot(x, y, rgb)
-#define PRINT_DOT2(x, y, rgb, alpha) fb_print_dot2(x, y, rgb, alpha)
-#define PRINT_EN()                   fb_print_en()
-#define PRINT_CLEAR(rgb)             fb_print_clean(rgb)
+#define VIEW_MAP_INIT() fb_map_init()
+#define VIEW_MAP_EN() fb_map_en()
 
 #endif
 
+//边界判定用
 #define VIEW_X_END (VIEW_X_SIZE - 1)
 #define VIEW_Y_END (VIEW_Y_SIZE - 1)
 

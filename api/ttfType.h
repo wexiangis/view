@@ -2,6 +2,13 @@
 #ifndef _TTFTYPE_H_
 #define _TTFTYPE_H_
 
+#include <stdint.h>
+
+//如果Makefile没有定义则自行定义
+#ifndef MAKE_FREETYPE
+#define MAKE_FREETYPE 1
+#endif
+
 //字体文件路径
 #define TTF_FILE "./ttf/Droid_Sans_Fallback.ttf"
 
@@ -11,8 +18,10 @@ typedef struct
     int bitWidth, bitHeight; //bitMap点阵宽高
     int bitLeft, bitTop;     //bitMap点阵相对 width*height 点阵左上角偏移量
     int lineByte;            //bitMap每行可用字节数(会有盈余,比如 bitWidth=6,而 lineByte 会给2字节)
-    unsigned char *bitMap;   //实际有效点阵数组,字节数为 bitHeight * lineByte
+    uint8_t *bitMap;   //实际有效点阵数组,字节数为 bitHeight * lineByte
 } Ttf_Map;
+
+#if(MAKE_FREETYPE)
 
 //主结构体初始化
 void *ttf_init(char *ttfFile);
@@ -47,7 +56,9 @@ void ttf_getSizeByUtf8_multiLine(void *obj, char *utf8, int type, int xEdge, int
 //单行模式
 int ttf_getSizeByUtf8(void *obj, char *utf8, int type, int xEdge, int *retH);
 
-#endif
+#endif // #if(MAKE_FREETYPE)
+
+#endif // _TTFTYPE_H_
 
 /************************* demo *************************
 
@@ -65,7 +76,7 @@ void draw(Ttf_Map map)
     //一行字节计数
     int lineByteCount;
     //画点用
-    unsigned char bit;
+    uint8_t bit;
     int i;
     //横纵向点计数
     int x = 0, y = 0;

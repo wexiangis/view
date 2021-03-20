@@ -17,11 +17,12 @@ ifeq ($(MAKE_PLATFORM),1)
 cross = mips-linux-gnu
 DIR += ./platform/t31
 CFLAG += -Wl,-gc-sections -lrt -ldl
-CFLAG += -muclibc # 使用 uclibc 时添加该项
+# 使用 uclibc 时添加该项,但很多三方库不支持uclibc
+# CFLAG += -muclibc
 endif
 
-# 静态编译(优先使用.a库文件编译,程序直接能跑,但文件巨大)
-CFLAG += -static
+# 静态编译(优先使用.a库文件编译,程序直接能跑,但文件巨大,部分库还不支持)
+# CFLAG += -static
 
 # 启用ttf字体支持 (0/不启用 1/启用)
 MAKE_FREETYPE ?= 1
@@ -54,6 +55,7 @@ endif
 
 # 传递宏定义给代码
 DEF += -DMAKE_PLATFORM=$(MAKE_PLATFORM)
+DEF += -DMAKE_FREETYPE=$(MAKE_FREETYPE)
 DEF += -DMAKE_JPEG=$(MAKE_JPEG)
 DEF += -DMAKE_PNG=$(MAKE_PNG)
 DEF += -DMAKE_HIREDIS=$(MAKE_HIREDIS)

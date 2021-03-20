@@ -11,6 +11,7 @@ int view_bar_vStart(View_Struct *view, void *object, View_Focus *focus, ViewButt
         tickSec = view->tickMs / 1000;
         //更新时间
         view->view->value->value.IntArray[2] = tickSec % 60;
+        view->view->valueAlpha = (10 - tickSec % 10) * 10;
     }
 
     return CALLBACK_OK;
@@ -35,6 +36,7 @@ View_Struct *view_bar_init(void)
     vsTemp->value->param[1] = 2;   //保留2个0
     vsTemp->valueType = 240;
     vsTemp->valueColor = &ViewColor.White;
+    vsTemp->valueAlpha = 50;
     view_add(vs, vsTemp, false);
 
     //电量图标

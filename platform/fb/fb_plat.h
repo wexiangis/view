@@ -3,15 +3,11 @@
 
 #define FB_X_SIZE 240
 #define FB_Y_SIZE 240
-#define FB_X_END (FB_X_SIZE - 1)
-#define FB_Y_END (FB_Y_SIZE - 1)
 #define FB_PB 3
 
-void fb_print_dot(int x, int y, int rgb);
-void fb_print_dot2(int x, int y, int rgb, float alpha);
-void fb_print_en(void);
-void fb_print_clean(int rgb);
-
-void fb_init(void);
+//返回 FB_X_SIZE * FB_Y_SIZE * FB_PB 的内存
+void *fb_map_init(void);
+//使能输出(刷新屏幕)
+void fb_map_en(void);
 
 #endif

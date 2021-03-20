@@ -1,6 +1,6 @@
 
-#ifndef __VIEWSRC_H_
-#define __VIEWSRC_H_
+#ifndef _VIEWSRC_H_
+#define _VIEWSRC_H_
 
 #include "viewPlat.h"
 #include "viewType.h"
@@ -82,13 +82,13 @@ extern void *ViewTTF;              //公共ttf解析控制符(用来调用ttfTyp
 
 //配置文件初始化
 void viewConfig_init(void);
-//viewSource初始化
-void viewSource_init(void);
+//viewSrc初始化
+void viewSrc_init(void);
 //viewColor初始化
 void viewColor_init(void);
 
-//检查 value 指针是否存在于 viewSource, 用于回收站决定是否释放内存
-bool viewSource_compare(ViewValue_Format *value);
+//检查 value 指针是否存在于 viewSrc, 用于回收站决定是否释放内存
+bool viewSrc_compare(ViewValue_Format *value);
 //检查 value 指针是否存在于 viewColor, 用于回收站决定是否释放内存
 bool viewColor_compare(ViewValue_Format *value);
 

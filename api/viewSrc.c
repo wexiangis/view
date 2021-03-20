@@ -9,12 +9,15 @@ void *ViewTTF;
 void viewConfig_init(void)
 {
     viewValue_reset(&ViewConfig.device, "device", VT_INT, 1, 0);
-    ViewTTF = ttf_init(TTF_FILE);
-    PLAT_INIT();
 }
 
-void viewSource_init(void)
+void viewSrc_init(void)
 {
+#if(MAKE_FREETYPE)
+    //ttf字体解析句柄初始化
+    ViewTTF = ttf_init(TTF_FILE);
+#endif
+
     //控件参数
     viewValue_reset(&ViewSrc.Common_Rad, "Common_Rad", VT_INT, 1, VIEW_RESOLUTION / 24);
     viewValue_reset(&ViewSrc.Common_ContentType, "Common_ContentType", VT_INT, 1, VIEW_RESOLUTION_PRINT);
@@ -86,7 +89,7 @@ void viewColor_init(void)
     }
 }
 
-bool viewSource_compare(ViewValue_Format *value)
+bool viewSrc_compare(ViewValue_Format *value)
 {
     int i, len;
     ViewValue_Format *vvf;

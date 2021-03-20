@@ -835,7 +835,7 @@ void _viewValue_save(FILE *fd, ViewValue_Format *vvf)
                 vvf->name, 1, vvf->value.Bool ? 'T' : 'F');
         break;
     case VT_INT:
-#if (VVF_SL_SHOW_HEX)
+#if(VVF_SL_SHOW_HEX)
         fprintf(fd, "# %s VT_INT %d\n%06X\\\n",
                 vvf->name, 1, vvf->value.Int);
         break;
@@ -862,7 +862,7 @@ void _viewValue_save(FILE *fd, ViewValue_Format *vvf)
         fprintf(fd, "# %s VT_INT_ARRAY %d\n",
                 vvf->name, (int)(vvf->vSize / sizeof(int)));
         for (j = 0; j < vvf->vSize / sizeof(int); j++)
-#if (VVF_SL_SHOW_HEX)
+#if(VVF_SL_SHOW_HEX)
             fprintf(fd, "%06X\\\n", vvf->value.IntArray[j]);
 #else
             fprintf(fd, "%d\\\n", vvf->value.IntArray[j]);
@@ -1153,7 +1153,7 @@ int viewValue_load(char *filePath, ViewValue_Format *array, int arrayLen)
                     case VT_INT:
                         if (fgets(line, LOAD_LINE_SIZE, fd) == NULL)
                             break;
-#if (VVF_SL_SHOW_HEX)
+#if(VVF_SL_SHOW_HEX)
                         sscanf(line, "%X", &vvfPoint->value.Int);
 #else
                         sscanf(line, "%d", &vvfPoint->value.Int);
@@ -1195,7 +1195,7 @@ int viewValue_load(char *filePath, ViewValue_Format *array, int arrayLen)
                             memset(line, 0, LOAD_LINE_SIZE);
                             if (fgets(line, LOAD_LINE_SIZE, fd) == NULL)
                                 break;
-#if (VVF_SL_SHOW_HEX)
+#if(VVF_SL_SHOW_HEX)
                             sscanf(line, "%X", &vvfPoint->value.IntArray[i]);
 #else
                             sscanf(line, "%d", &vvfPoint->value.IntArray[i]);

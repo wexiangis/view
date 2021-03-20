@@ -1,6 +1,6 @@
 freetype2: http://download.savannah.gnu.org/releases/freetype/
 libtool: http://www.gnu.org/software/libtool/
 jpeg6: https://sourceforge.net/projects/libjpeg/files/
-zlib: http://www.zlib.net/
+zlib: http://www.zlib.net/ or https://github.com/madler/zlib/tags
 libpng: https://sourceforge.net/projects/libpng/files/libpng16/1.6.37/
 hiredis: https://github.com/redis/hiredis/tags

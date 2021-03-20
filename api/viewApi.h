@@ -1,6 +1,6 @@
 
-#ifndef __VIEWAPI_H_
-#define __VIEWAPI_H_
+#ifndef _VIEWAPI_H_
+#define _VIEWAPI_H_
 
 #include <time.h>
 
@@ -13,11 +13,28 @@
 #include "pngType.h"  //图片解析
 #include "ttfType.h"  //矢量字体解析
 
-//========== UI系统初始化 ==========
+//--------------------  UI系统初始化 --------------------
 
 void view_init(void);
 
-//========== 控件在链表中的 添加/插入/移除 方法 ==========
+//--------------------  基本画图接口 --------------------
+
+//画点
+void print_dot(int x, int y, int rgb);
+//alpha透明度0~100,不透明~完全透明
+void print_dot2(int x, int y, int rgb, int alpha);
+//用rgb颜色清屏
+void print_clean(int rgb);
+//使能输出
+void print_en(void);
+
+//--------------------- 延时和时间 --------------------
+
+void view_delayms(uint32_t ms);
+int view_tickMs(void);
+struct tm *view_time(void);
+
+//---------- 控件在链表中的 添加/插入/移除 方法 -----------
 
 //往 parent 的子链表添加 view,front=false 添加到尾,front=true 添加到头
 void view_add(View_Struct *parentView, View_Struct *view, bool front);
@@ -27,18 +44,18 @@ void view_insert(View_Struct *nodeView, View_Struct *view, bool front);
 void view_remove(View_Struct *view);
 //在 view 所在链表中安全的移除 view,并添加到垃圾桶中(内存将被释放掉,不允许继续访问这个 *view 指针)
 void view_delete(View_Struct *view);
+//父子相认
+bool view_isChild(View_Struct *parent, View_Struct *child);
 //返回与 view 同链表中序号为 n 的那个 view (n从1数起)
 View_Struct *view_num(View_Struct *view, int n);
 
-//========== 垃圾桶里的 unit/view 的释放 ==========
+//------------- 垃圾桶里的 unit/view 的释放 -------------
 
 void viewTrash_clean(void);
 
-//=============== viewTool is ? ===============
+//---------------------- 其它 ------------------------
 
-bool view_isChild(View_Struct *parent, View_Struct *child);
-
-//==================== 控件的绘制 ====================
+//-------------------- 控件的绘制 ----------------------
 
 int view_draw(
     void *object,
@@ -48,14 +65,14 @@ int view_draw(
     View_Struct *view,
     int xyLimit[2][2]);
 
-//==================== 触屏的遍历 ====================
+//---------------------- 触屏的遍历 ---------------------
 
 ViewCallBack view_touchLocal(
     int xy[2],
     View_Struct *view,
     View_Struct **retView);
 
-//==================== Focus 操作 ====================
+//----------------------- Focus 操作 -------------------
 
 View_Focus *view_focusInit(View_Struct *topView, View_Struct *cView, ViewValue_Format *color);
 void view_focusRecover(View_Focus *focus);
@@ -63,9 +80,10 @@ void view_focusNote(View_Focus *focus, View_Struct *view);
 void view_focusJump(View_Focus *focus, View_Struct *jumpView);
 ViewCallBack view_focusEvent(View_Focus *focus, ViewFocus_Event event);
 
-//==================== 输入方法封装 ====================
+//----------------------- 输入方法封装 -------------------
 
-#define VIEW_DEL_CHAR ' ' //默认删除字符, 在候选数组*candidate中排在第一个的字符为' '时作删除符使用
+//默认删除字符, 在候选数组*candidate中排在第一个的字符为' '时作删除符使用
+#define VIEW_DEL_CHAR ' '
 
 void view_input(
     char *label,
@@ -79,18 +97,17 @@ void view_input(
     View_Struct *callBackNextView,
     int astrict);
 
-//==================== 根据内容和限制宽度,获取可能的最大字体 ====================
+//-------------- 根据内容和限制宽度,获取可能的最大字体 ----------
 
 //根据txt长度自动推荐字体,最小返回280
 int view_getType(char *text, int width, int xEdge);
 
-//==================== 公共绘图方法 ====================
+//---------------------- 公共绘图方法 ------------------------
 
-//全世界都能调用的绘图方法,调用即输出到屏幕缓冲,最后记得用 PRINT_EN() 使能输出
 void view_dot(
     int color,
     int xStart, int yStart,
-    int size, float alpha);
+    int size, int alpha);
 int view_getDot(
     int xStart, int yStart,
     int xEnd, int yEnd,
@@ -99,12 +116,12 @@ void view_line(
     int color,
     int xStart, int yStart,
     int xEnd, int yEnd,
-    int size, int space, float alpha);
+    int size, int space, int alpha);
 void view_circle(
     int color,
     int xStart, int yStart,
     int rad, int size,
-    float alpha,
+    int alpha,
     int minX, int minY,
     int maxX, int maxY);
 void view_circleLoop(
@@ -118,7 +135,7 @@ void view_rectangle(
     int color,
     int xStart, int yStart,
     int xEnd, int yEnd,
-    int size, int rad, float alpha,
+    int size, int rad, int alpha,
     int minX, int minY,
     int maxX, int maxY);
 void view_rectangle_padding(
@@ -130,7 +147,7 @@ void view_rectangle_padding(
     int picReplaceColor,
     int picReplaceColorBy,
     bool picUseInvisibleColor,
-    int picInvisibleColor, float alpha,
+    int picInvisibleColor, int alpha,
     int xMin, int yMin, int xMax, int yMax);
 void view_rectangle_padding2(
     uint8_t ***picMap,
@@ -141,13 +158,13 @@ void view_rectangle_padding2(
     int picReplaceColor,
     int picReplaceColorBy,
     bool picUseInvisibleColor,
-    int picInvisibleColor, float alpha,
+    int picInvisibleColor, int alpha,
     int xMin, int yMin, int xMax, int yMax);
 void view_parallelogram(
     int color,
     int xStart, int yStart,
     int xEnd, int yEnd,
-    int size, int width, float alpha,
+    int size, int width, int alpha,
     int minX, int minY,
     int maxX, int maxY);
 void view_printBitMap(
@@ -159,7 +176,7 @@ void view_printBitMap2(
     int xStart, int yStart,
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
-    float alpha,
+    int alpha,
     Ttf_Map map);
 void view_string(
     int fColor,
@@ -174,7 +191,7 @@ void view_string_rectangle(
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
     int type, int space,
-    float alpha);
+    int alpha);
 int view_string_rectangleLineWrap(
     int fColor, int bColor,
     char *str,
@@ -184,7 +201,7 @@ int view_string_rectangleLineWrap(
     int xScreenEnd, int yScreenEnd,
     int type,
     int xSpace, int ySpace,
-    float alpha,
+    int alpha,
     int *retWordPerLine,
     int *retLine);
 int view_string_rectangleCR(
@@ -195,11 +212,6 @@ int view_string_rectangleCR(
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
     int type, int space, int xErr,
-    float alpha);
-
-void view_delayms(uint32_t ms);
-
-int view_tickMs(void);
-struct tm *view_time(void);
+    int alpha);
 
 #endif

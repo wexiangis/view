@@ -4,6 +4,8 @@
 
 #include "ttfType.h"
 
+#if(MAKE_FREETYPE)
+
 #include "ft2build.h"
 #include FT_FREETYPE_H
 #include FT_MULTIPLE_MASTERS_H
@@ -83,8 +85,8 @@ void ttf_clean(void *obj)
     TtfCache_Word *cWord, *cWordNext;
 
     // 禁止异步!!
-    static unsigned char head = 0, tail = 0;
-    unsigned char take = 0;
+    static uint8_t head = 0, tail = 0;
+    uint8_t take = 0;
     take = tail++;
     while (take != head)
         usleep(1000);
@@ -148,8 +150,8 @@ void ttf_release(void *obj)
  */
 static TtfCache_Word *ttf_findWord(TtfCache_Type **cacheType, int type, FT_ULong unicode, int byteNum)
 {
-    static unsigned char head = 0, tail = 0;
-    unsigned char take = 0;
+    static uint8_t head = 0, tail = 0;
+    uint8_t take = 0;
 
     TtfCache_Word *cWord = NULL;
     TtfCache_Type *cType = NULL;
@@ -244,7 +246,7 @@ static TtfCache_Word *ttf_findWord(TtfCache_Type **cacheType, int type, FT_ULong
  *  utf8转unicode
  *  返回: 使用掉(数组utf8)的字节数，失败返回-1
  */
-static int ttf_utf8ToUnicode(unsigned char *utf8, FT_ULong *unicode)
+static int ttf_utf8ToUnicode(uint8_t *utf8, FT_ULong *unicode)
 {
     // ------unicode-------|-----utf8-----
     // 0000 0000-0000 007F | 0xxxxxxx
@@ -328,14 +330,14 @@ int ttf_getMapByUtf8(void *obj, char *utf8, int type, Ttf_Map *map)
     TtfCache_Word *cWord = NULL;
 
     // 禁止异步!!
-    static unsigned char head = 0, tail = 0;
-    unsigned char take = 0;
+    static uint8_t head = 0, tail = 0;
+    uint8_t take = 0;
     take = tail++;
     while (take != head)
         usleep(1000);
 
     //utf8 转 unicode
-    if ((retByte = ttf_utf8ToUnicode((unsigned char *)utf8, &unicode)) < 0)
+    if ((retByte = ttf_utf8ToUnicode((uint8_t *)utf8, &unicode)) < 0)
         goto exit;
 
     //从缓存检索字型内存块
@@ -381,7 +383,7 @@ int ttf_getMapByUtf8(void *obj, char *utf8, int type, Ttf_Map *map)
     if (FT_Render_Glyph(glyph, ft_render_mode_mono) == 0)
     {
         //备份该字型数据
-        cWord->map.bitMap = (unsigned char *)calloc((glyph->bitmap.rows + 1) * glyph->bitmap.pitch, 1);
+        cWord->map.bitMap = (uint8_t *)calloc((glyph->bitmap.rows + 1) * glyph->bitmap.pitch, 1);
         memcpy(cWord->map.bitMap, glyph->bitmap.buffer, glyph->bitmap.rows * glyph->bitmap.pitch);
         //信息拷贝
         cWord->map.bitWidth = glyph->bitmap.width;
@@ -431,8 +433,8 @@ void ttf_getSizeByUtf8_multiLine(void *obj, char *utf8, int type, int xEdge, int
     TtfCache_Word *cWord = NULL;
 
     // 禁止异步!!
-    static unsigned char head = 0, tail = 0;
-    unsigned char take = 0;
+    static uint8_t head = 0, tail = 0;
+    uint8_t take = 0;
     take = tail++;
     while (take != head)
         usleep(1000);
@@ -440,7 +442,7 @@ void ttf_getSizeByUtf8_multiLine(void *obj, char *utf8, int type, int xEdge, int
     while (*utf8)
     {
         //utf8 转 unicode
-        retByte = ttf_utf8ToUnicode((unsigned char *)utf8, &unicode);
+        retByte = ttf_utf8ToUnicode((uint8_t *)utf8, &unicode);
         //得到字符宽度
         if (retByte < 0) //特殊字符处理
         {
@@ -491,7 +493,7 @@ void ttf_getSizeByUtf8_multiLine(void *obj, char *utf8, int type, int xEdge, int
                 if (FT_Render_Glyph(glyph, ft_render_mode_mono) == 0)
                 {
                     //备份该字型数据
-                    cWord->map.bitMap = (unsigned char *)calloc((glyph->bitmap.rows + 1) * glyph->bitmap.pitch, 1);
+                    cWord->map.bitMap = (uint8_t *)calloc((glyph->bitmap.rows + 1) * glyph->bitmap.pitch, 1);
                     memcpy(cWord->map.bitMap, glyph->bitmap.buffer, glyph->bitmap.rows * glyph->bitmap.pitch);
                     //参数拷贝
                     cWord->map.bitWidth = glyph->bitmap.width;
@@ -562,8 +564,8 @@ int ttf_getSizeByUtf8(void *obj, char *utf8, int type, int xEdge, int *retH)
     TtfCache_Word *cWord = NULL;
 
     // 禁止异步!!
-    static unsigned char head = 0, tail = 0;
-    unsigned char take = 0;
+    static uint8_t head = 0, tail = 0;
+    uint8_t take = 0;
     take = tail++;
     while (take != head)
         usleep(1000);
@@ -571,7 +573,7 @@ int ttf_getSizeByUtf8(void *obj, char *utf8, int type, int xEdge, int *retH)
     while (*utf8)
     {
         //utf8 转 unicode
-        retByte = ttf_utf8ToUnicode((unsigned char *)utf8, &unicode);
+        retByte = ttf_utf8ToUnicode((uint8_t *)utf8, &unicode);
         //得到字符宽度
         if (retByte < 0) //特殊字符处理
         {
@@ -619,7 +621,7 @@ int ttf_getSizeByUtf8(void *obj, char *utf8, int type, int xEdge, int *retH)
                 if (FT_Render_Glyph(glyph, ft_render_mode_mono) == 0)
                 {
                     //备份该字型数据
-                    cWord->map.bitMap = (unsigned char *)calloc((glyph->bitmap.rows + 1) * glyph->bitmap.pitch, 1);
+                    cWord->map.bitMap = (uint8_t *)calloc((glyph->bitmap.rows + 1) * glyph->bitmap.pitch, 1);
                     memcpy(cWord->map.bitMap, glyph->bitmap.buffer, glyph->bitmap.rows * glyph->bitmap.pitch);
 
                     cWord->map.bitWidth = glyph->bitmap.width;
@@ -646,3 +648,5 @@ exit:
     head += 1;
     return retWidth;
 }
+
+#endif // #if(MAKE_FREETYPE)

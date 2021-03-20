@@ -8,7 +8,7 @@
 
 typedef struct
 {
-    unsigned char r, g, b;
+    uint8_t r, g, b;
 } Jpeg_Rgb;
 
 typedef struct
@@ -24,7 +24,7 @@ typedef struct
 } Jpeg_Private;
 
 /*
- *  生成 bmp 图片
+ *  生成 jpeg 图片
  *  参数:
  *      outFile: 路径
  *      rgb: 原始数据
@@ -34,7 +34,7 @@ typedef struct
  *      quality: 压缩质量,1~100,越大越好,文件越大
  *  返回: 0成功 -1失败
  */
-int jpeg_create(char *outFile, unsigned char *rgb, int width, int height, int pixelBytes, int quality)
+int jpeg_create(char *outFile, uint8_t *rgb, int width, int height, int pixelBytes, int quality)
 {
     FILE *fp;
     int rowSize;
@@ -129,20 +129,20 @@ void *jpeg_createLine(char *outFile, int width, int height, int pixelBytes, int 
 }
 
 /*
- *  bmp 图片数据获取
+ *  jpeg 图片数据获取
  *  参数:
  *      inFile: 路径
  *      width: 返回图片宽(像素), 不接收置NULL
  *      height: 返回图片高(像素), 不接收置NULL
  *      pixelBytes: 返回图片每像素的字节数, 不接收置NULL
  * 
- *  返回: 图片数据指针, 已分配内存, 用完记得释放
+ *  返回: rgb图片数据指针, 已分配内存, 用完记得释放
  */
-unsigned char *jpeg_get(char *inFile, int *width, int *height, int *pixelBytes)
+uint8_t *jpeg_get(char *inFile, int *width, int *height, int *pixelBytes)
 {
     FILE *fp;
     int offset, rowSize;
-    unsigned char *retRgb;
+    uint8_t *retRgb;
     JSAMPROW jsampRow[1];
     struct jpeg_error_mgr jerr;
     struct jpeg_decompress_struct dinfo;
@@ -189,7 +189,7 @@ unsigned char *jpeg_get(char *inFile, int *width, int *height, int *pixelBytes)
         *pixelBytes = dinfo.output_components;
 
     // 计算图片RGB数据大小,并分配内存
-    retRgb = (unsigned char *)calloc(
+    retRgb = (uint8_t *)calloc(
         dinfo.output_width * dinfo.output_height * dinfo.output_components + 1, 1);
 
     // Process data
@@ -268,7 +268,7 @@ void *jpeg_getLine(char *inFile, int *width, int *height, int *pixelBytes)
     return jp;
 }
 
-int _jpeg_createLine(void *obj, unsigned char *rgbLine, int line)
+int _jpeg_createLine(void *obj, uint8_t *rgbLine, int line)
 {
     Jpeg_Private *jp = (Jpeg_Private *)obj;
     JSAMPROW jsampRow[line];
@@ -294,7 +294,7 @@ int _jpeg_createLine(void *obj, unsigned char *rgbLine, int line)
     return line;
 }
 
-int _jpeg_getLine(void *obj, unsigned char *rgbLine, int line)
+int _jpeg_getLine(void *obj, uint8_t *rgbLine, int line)
 {
     Jpeg_Private *jp = (Jpeg_Private *)obj;
     JSAMPROW jsampRow[1];
@@ -331,7 +331,7 @@ int _jpeg_getLine(void *obj, unsigned char *rgbLine, int line)
  *      读图片时返回实际读取行数,
  *      返回0时结束(此时系统自动回收内存)
  */
-int jpeg_line(void *obj, unsigned char *rgbLine, int line)
+int jpeg_line(void *obj, uint8_t *rgbLine, int line)
 {
     Jpeg_Private *jp = (Jpeg_Private *)obj;
     // 参数检查
@@ -351,7 +351,7 @@ int jpeg_line(void *obj, unsigned char *rgbLine, int line)
 void jpeg_closeLine(void *obj)
 {
     Jpeg_Private *jp = (Jpeg_Private *)obj;
-    unsigned char *rgbLine;
+    uint8_t *rgbLine;
     if (jp)
     {
         //用文件指针判断流是否关闭
@@ -360,7 +360,7 @@ void jpeg_closeLine(void *obj)
             //必须把行数据填充足够,否则关闭失败
             if (jp->rowCount != jp->rowMax)
             {
-                rgbLine = (unsigned char *)calloc(jp->rowSize, 1);
+                rgbLine = (uint8_t *)calloc(jp->rowSize, 1);
                 while (jpeg_line(jp, rgbLine, 1) == 1)
                     ;
                 free(rgbLine);

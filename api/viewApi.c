@@ -4,6 +4,94 @@
 
 #include "viewApi.h"
 
+typedef union {
+    uint8_t map[VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB];
+    uint8_t rgb[VIEW_Y_SIZE][VIEW_X_SIZE][VIEW_PB];
+} View_Map;
+
+static View_Map *view_map = NULL;
+
+//--------------------  UI系统初始化 --------------------
+
+void view_init(void)
+{
+    //平台初始化,获取屏幕缓存
+    view_map = (View_Map *)VIEW_MAP_INIT();
+    if (!view_map)
+    {
+        fprintf(stderr, "view_init: VIEW_MAP_INIT failed !!\r\n");
+        exit(-1);
+    }
+    //配置文件初始化
+    viewConfig_init();
+    //viewSrc初始化
+    viewSrc_init();
+    //viewColor初始化
+    viewColor_init();
+}
+
+//--------------------  基本画图接口 --------------------
+
+void print_dot(int x, int y, int rgb)
+{
+    if (rgb < 0 ||
+        x < 0 || x > VIEW_X_END ||
+        y < 0 || y > VIEW_Y_END)
+        return;
+
+    view_map->rgb[y][x][2] = (uint8_t)(rgb & 0xFF);
+    rgb >>= 8;
+    view_map->rgb[y][x][1] = (uint8_t)(rgb & 0xFF);
+    rgb >>= 8;
+    view_map->rgb[y][x][0] = (uint8_t)(rgb & 0xFF);
+}
+
+//alpha透明度0~100,不透明~完全透明
+void print_dot2(int x, int y, int rgb, int alpha)
+{
+    if (rgb < 0 ||
+        x < 0 || x > VIEW_X_END ||
+        y < 0 || y > VIEW_Y_END)
+        return;
+
+    view_map->rgb[y][x][2] = (uint8_t)((view_map->rgb[y][x][2] * alpha + (uint8_t)(rgb & 0xFF) * (100 - alpha)) / 100);
+    rgb >>= 8;
+    view_map->rgb[y][x][1] = (uint8_t)((view_map->rgb[y][x][1] * alpha + (uint8_t)(rgb & 0xFF) * (100 - alpha)) / 100);
+    rgb >>= 8;
+    view_map->rgb[y][x][0] = (uint8_t)((view_map->rgb[y][x][0] * alpha + (uint8_t)(rgb & 0xFF) * (100 - alpha)) / 100);
+}
+
+void print_clean(int rgb)
+{
+    int x, y, c;
+
+    uint8_t R = (uint8_t)((rgb & 0xFF0000) >> 16);
+    uint8_t G = (uint8_t)((rgb & 0x00FF00) >> 8);
+    uint8_t B = (uint8_t)(rgb & 0x0000FF);
+
+    if (R == G && G == B)
+        memset(view_map->map, R, sizeof(View_Map));
+    else
+    {
+        for (y = 0, c = 0; y < VIEW_Y_SIZE; y++)
+        {
+            for (x = 0; x < VIEW_X_SIZE; x++)
+            {
+                view_map->map[c++] = R;
+                view_map->map[c++] = G;
+                view_map->map[c++] = B;
+            }
+        }
+    }
+}
+
+void print_en(void)
+{
+    VIEW_MAP_EN();
+}
+
+//--------------------- 延时和时间 --------------------
+
 void view_delayms(uint32_t ms)
 {
     struct timeval delay;
@@ -34,26 +122,71 @@ struct tm *view_time(void)
     return localtime(&now);
 }
 
-//根据RGB内存块制作二维指针数组
-uint8_t ***bmp_mapInit(uint8_t *pic, int width, int height, int pb)
+//--------------------- 图片内存管理 --------------------
+
+/*
+ *  1. 把传入的rgb或argb(看pb字节数)数据转换为argb
+ *  2. 返回生成的二维指针网格
+ */
+uint8_t ***picMap_init(uint8_t **pic, int width, int height, int *pb)
 {
-    uint8_t ***map;
-    int xC, yC;
-    if (pic == NULL || width < 1 || height < 1 || pb < 1)
-        return NULL;
-    map = (uint8_t ***)calloc(height, sizeof(uint8_t **));
-    for (yC = 0; yC < height; yC++)
+    uint8_t ***pMap;
+    int i, j, offset;
+    //备份原数据
+    uint8_t *picOld = *pic;
+    uint8_t *picNew = *pic;
+    int pbOld = *pb;
+    int pbNew = *pb;
+
+    if (!picOld ||
+        width < 1 || height < 1 ||
+        (pbOld != 3 && pbOld != 4))
     {
-        map[yC] = (uint8_t **)calloc(width, sizeof(uint8_t *));
-        for (xC = 0; xC < width; xC++)
-            map[yC][xC] = &pic[yC * width * pb + xC * pb];
+        fprintf(stderr, "picMap_init failed, %p %d x %d x %d \r\n",
+            picOld, width, height, pbOld);
+        return NULL;
     }
-    return map;
+
+    //把rgb数据转为argb数据
+    if (pbOld == 3)
+    {
+        pbNew = 4;
+        picNew = (uint8_t *)calloc(width * height * 4, 1);
+        //拓展rgb数据为argb,其中a值使用255
+        for (i = j = 0; i < width * height * pbOld;)
+        {
+            //写一个A值,拷贝3个RGB值
+            picNew[j++] = 255;
+            picNew[j++] = picOld[i++];
+            picNew[j++] = picOld[i++];
+            picNew[j++] = picOld[i++];
+        }
+        //释放旧内存
+        free(picOld);
+    }
+    //生成 width*height 的指针网格,每个指针指向一组ARGB数据
+    pMap = (uint8_t ***)calloc(height, sizeof(uint8_t **));
+    for (i = 0, offset = 0; i < height; i++)
+    {
+        pMap[i] = (uint8_t **)calloc(width, sizeof(uint8_t *));
+        for (j = 0; j < width; j++)
+        {
+            pMap[i][j] = &picNew[offset];
+            offset += pbNew;
+        }
+    }
+    //更新数据
+    *pic = picNew;
+    *pb = pbNew;
+    return pMap;
 }
-void bmp_mapRelease(uint8_t ***picMap, int width, int height)
+/*
+ *  二维指针网格内存回收
+ */
+void picMap_release(uint8_t ***picMap, int width, int height)
 {
     int i;
-    if (picMap == NULL)
+    if (!picMap)
         return;
     for (i = 0; i < height; i++)
         free(picMap[i]);
@@ -139,12 +272,12 @@ void viewTrash_clean(void)
             vsThis->sideColor = NULL;
         }
         //数据资源释放
-        if (vsThis->value && !viewSource_compare(vsThis->value))
+        if (vsThis->value && !viewSrc_compare(vsThis->value))
         {
             viewValue_release(vsThis->value);
             vsThis->value = NULL;
         }
-        if (vsThis->valueBackup && !viewSource_compare(vsThis->valueBackup))
+        if (vsThis->valueBackup && !viewSrc_compare(vsThis->valueBackup))
         {
             viewValue_release(vsThis->valueBackup);
             vsThis->valueBackup = NULL;
@@ -152,7 +285,7 @@ void viewTrash_clean(void)
         //图片内存释放
         if (vsThis->picMap)
         {
-            bmp_mapRelease(vsThis->picMap, vsThis->picWidth, vsThis->picHeight);
+            picMap_release(vsThis->picMap, vsThis->picWidth, vsThis->picHeight);
             vsThis->picMap = NULL;
         }
         if (vsThis->pic)
@@ -169,7 +302,7 @@ void viewTrash_clean(void)
         //含有子 view
         if (vsThis->view)
         {
-            if (vsNext == NULL)
+            if (!vsNext)
             {
                 vsNext = vsThis->view;
                 viewTrash.lastView = vsThis->lastView;
@@ -207,7 +340,7 @@ void view_circle(
     int color,
     int xStart, int yStart,
     int rad, int size,
-    float alpha,
+    int alpha,
     int minX, int minY,
     int maxX, int maxY)
 {
@@ -285,7 +418,7 @@ void view_circle(
                 if (xC2 < minX || xC2 > maxX)
                     continue;
                 else if (memBUff[yC][xC])
-                    PRINT_DOT(xC2, yC2, color);
+                    print_dot(xC2, yC2, color);
             }
         }
     }
@@ -302,7 +435,7 @@ void view_circle(
                 if (xC2 < minX || xC2 > maxX)
                     continue;
                 else if (memBUff[yC][xC])
-                    PRINT_DOT2(xC2, yC2, color, alpha);
+                    print_dot2(xC2, yC2, color, alpha);
             }
         }
     }
@@ -368,24 +501,24 @@ void view_circleLoop(int color, int xStart, int yStart, int rad, int size, int d
         {
             if (div < 2) //div < 2 的都是画完整一圈的
             {
-                PRINT_DOT(xStart + circle_a, yStart - circle_b, color); //1
-                PRINT_DOT(xStart + circle_b, yStart - circle_a, color); //2
-                PRINT_DOT(xStart + circle_b, yStart + circle_a, color); //3
-                PRINT_DOT(xStart + circle_a, yStart + circle_b, color); //4
-                PRINT_DOT(xStart - circle_a, yStart + circle_b, color); //5
-                PRINT_DOT(xStart - circle_b, yStart + circle_a, color); //6
-                PRINT_DOT(xStart - circle_b, yStart - circle_a, color); //7
-                PRINT_DOT(xStart - circle_a, yStart - circle_b, color); //8
+                print_dot(xStart + circle_a, yStart - circle_b, color); //1
+                print_dot(xStart + circle_b, yStart - circle_a, color); //2
+                print_dot(xStart + circle_b, yStart + circle_a, color); //3
+                print_dot(xStart + circle_a, yStart + circle_b, color); //4
+                print_dot(xStart - circle_a, yStart + circle_b, color); //5
+                print_dot(xStart - circle_b, yStart + circle_a, color); //6
+                print_dot(xStart - circle_b, yStart - circle_a, color); //7
+                print_dot(xStart - circle_a, yStart - circle_b, color); //8
                 //if(circle_size > 1)
                 {
-                    PRINT_DOT(xStart + circle_a, yStart - circle_b + 1, color); //补点
-                    PRINT_DOT(xStart + circle_b - 1, yStart - circle_a, color); //补点
-                    PRINT_DOT(xStart + circle_b - 1, yStart + circle_a, color); //补点
-                    PRINT_DOT(xStart + circle_a, yStart + circle_b - 1, color); //补点
-                    PRINT_DOT(xStart - circle_a, yStart + circle_b - 1, color); //补点
-                    PRINT_DOT(xStart - circle_b + 1, yStart + circle_a, color); //补点
-                    PRINT_DOT(xStart - circle_b + 1, yStart - circle_a, color); //补点
-                    PRINT_DOT(xStart - circle_a, yStart - circle_b + 1, color); //补点
+                    print_dot(xStart + circle_a, yStart - circle_b + 1, color); //补点
+                    print_dot(xStart + circle_b - 1, yStart - circle_a, color); //补点
+                    print_dot(xStart + circle_b - 1, yStart + circle_a, color); //补点
+                    print_dot(xStart + circle_a, yStart + circle_b - 1, color); //补点
+                    print_dot(xStart - circle_a, yStart + circle_b - 1, color); //补点
+                    print_dot(xStart - circle_b + 1, yStart + circle_a, color); //补点
+                    print_dot(xStart - circle_b + 1, yStart - circle_a, color); //补点
+                    print_dot(xStart - circle_a, yStart - circle_b + 1, color); //补点
                 }
             }
             else //先记下一圈数据, 后期处理后再画
@@ -440,43 +573,43 @@ void view_circleLoop(int color, int xStart, int yStart, int rad, int size, int d
 
                 if (circle_a > rangeArray[0][0] && circle_a < rangeArray[0][1])
                 {
-                    PRINT_DOT(xStart + circle_a, yStart - circle_b, color);     //1
-                    PRINT_DOT(xStart + circle_a, yStart - circle_b + 1, color); //补点
+                    print_dot(xStart + circle_a, yStart - circle_b, color);     //1
+                    print_dot(xStart + circle_a, yStart - circle_b + 1, color); //补点
                 }
                 if (sumCount2 - circle_a > rangeArray[1][0] && sumCount2 - circle_a < rangeArray[1][1])
                 {
-                    PRINT_DOT(xStart + circle_b, yStart - circle_a, color);     //2
-                    PRINT_DOT(xStart + circle_b - 1, yStart - circle_a, color); //补点
+                    print_dot(xStart + circle_b, yStart - circle_a, color);     //2
+                    print_dot(xStart + circle_b - 1, yStart - circle_a, color); //补点
                 }
                 if (circle_a > rangeArray[2][0] && circle_a < rangeArray[2][1])
                 {
-                    PRINT_DOT(xStart + circle_b, yStart + circle_a, color);     //3
-                    PRINT_DOT(xStart + circle_b - 1, yStart + circle_a, color); //补点
+                    print_dot(xStart + circle_b, yStart + circle_a, color);     //3
+                    print_dot(xStart + circle_b - 1, yStart + circle_a, color); //补点
                 }
                 if (sumCount2 - circle_a > rangeArray[3][0] && sumCount2 - circle_a < rangeArray[3][1])
                 {
-                    PRINT_DOT(xStart + circle_a, yStart + circle_b, color);     //4
-                    PRINT_DOT(xStart + circle_a, yStart + circle_b - 1, color); //补点
+                    print_dot(xStart + circle_a, yStart + circle_b, color);     //4
+                    print_dot(xStart + circle_a, yStart + circle_b - 1, color); //补点
                 }
                 if (circle_a > rangeArray[4][0] && circle_a < rangeArray[4][1])
                 {
-                    PRINT_DOT(xStart - circle_a, yStart + circle_b, color);     //5
-                    PRINT_DOT(xStart - circle_a, yStart + circle_b - 1, color); //补点
+                    print_dot(xStart - circle_a, yStart + circle_b, color);     //5
+                    print_dot(xStart - circle_a, yStart + circle_b - 1, color); //补点
                 }
                 if (sumCount2 - circle_a > rangeArray[5][0] && sumCount2 - circle_a < rangeArray[5][1])
                 {
-                    PRINT_DOT(xStart - circle_b, yStart + circle_a, color);     //6
-                    PRINT_DOT(xStart - circle_b + 1, yStart + circle_a, color); //补点
+                    print_dot(xStart - circle_b, yStart + circle_a, color);     //6
+                    print_dot(xStart - circle_b + 1, yStart + circle_a, color); //补点
                 }
                 if (circle_a > rangeArray[6][0] && circle_a < rangeArray[6][1])
                 {
-                    PRINT_DOT(xStart - circle_b, yStart - circle_a, color);     //7
-                    PRINT_DOT(xStart - circle_b + 1, yStart - circle_a, color); //补点
+                    print_dot(xStart - circle_b, yStart - circle_a, color);     //7
+                    print_dot(xStart - circle_b + 1, yStart - circle_a, color); //补点
                 }
                 if (sumCount2 - circle_a > rangeArray[7][0] && sumCount2 - circle_a < rangeArray[7][1])
                 {
-                    PRINT_DOT(xStart - circle_a, yStart - circle_b, color);     //8
-                    PRINT_DOT(xStart - circle_a, yStart - circle_b + 1, color); //补点
+                    print_dot(xStart - circle_a, yStart - circle_b, color);     //8
+                    print_dot(xStart - circle_a, yStart - circle_b + 1, color); //补点
                 }
             }
         }
@@ -493,42 +626,42 @@ void view_circleLoop(int color, int xStart, int yStart, int rad, int size, int d
  *      size : 1~2
  *  返回: 无
  */
-void view_dot(int color, int xStart, int yStart, int size, float alpha)
+void view_dot(int color, int xStart, int yStart, int size, int alpha)
 {
     if (size == 1)
     {
         if (alpha > 0)
-            PRINT_DOT2(xStart, yStart, color, alpha);
+            print_dot2(xStart, yStart, color, alpha);
         else
-            PRINT_DOT(xStart, yStart, color);
+            print_dot(xStart, yStart, color);
     }
     else if (size == 2)
     {
         if (alpha > 0)
         {
             //mid
-            PRINT_DOT2(xStart, yStart, color, alpha);
+            print_dot2(xStart, yStart, color, alpha);
             //up
-            PRINT_DOT2(xStart, yStart + 1, color, alpha);
+            print_dot2(xStart, yStart + 1, color, alpha);
             //down
-            PRINT_DOT2(xStart, yStart - 1, color, alpha);
+            print_dot2(xStart, yStart - 1, color, alpha);
             //left
-            PRINT_DOT2(xStart + 1, yStart, color, alpha);
+            print_dot2(xStart + 1, yStart, color, alpha);
             //right
-            PRINT_DOT2(xStart - 1, yStart, color, alpha);
+            print_dot2(xStart - 1, yStart, color, alpha);
         }
         else
         {
             //mid
-            PRINT_DOT(xStart, yStart, color);
+            print_dot(xStart, yStart, color);
             //up
-            PRINT_DOT(xStart, yStart + 1, color);
+            print_dot(xStart, yStart + 1, color);
             //down
-            PRINT_DOT(xStart, yStart - 1, color);
+            print_dot(xStart, yStart - 1, color);
             //left
-            PRINT_DOT(xStart + 1, yStart, color);
+            print_dot(xStart + 1, yStart, color);
             //right
-            PRINT_DOT(xStart - 1, yStart, color);
+            print_dot(xStart - 1, yStart, color);
         }
     }
     else if (size > 2)
@@ -611,7 +744,7 @@ int view_getDot(int xStart, int yStart, int xEnd, int yEnd, int *dotX, int *dotY
  *      space : 不为0时画的是虚线, 其值代表虚线的点密度
  *  返回: 无
  */
-void view_line(int color, int xStart, int yStart, int xEnd, int yEnd, int size, int space, float alpha)
+void view_line(int color, int xStart, int yStart, int xEnd, int yEnd, int size, int space, int alpha)
 {
     unsigned short t;
     int xerr = 0, yerr = 0;
@@ -719,7 +852,7 @@ void view_rectangle(
     int color,
     int xStart, int yStart,
     int xEnd, int yEnd,
-    int size, int rad, float alpha,
+    int size, int rad, int alpha,
     int minX, int minY,
     int maxX, int maxY)
 {
@@ -1010,12 +1143,12 @@ void view_rectangle(
         {
             if (yC < minY || yC > maxY)
                 continue;
-            for (j = 0, xC = xS, k; j < xSize; j++, xC++)
+            for (j = 0, xC = xS; j < xSize; j++, xC++)
             {
                 if (xC < minX || xC > maxX)
                     continue;
                 else if (outPutArray[i][j])
-                    PRINT_DOT2(xC, yC, color, alpha);
+                    print_dot2(xC, yC, color, alpha);
             }
         }
     }
@@ -1025,12 +1158,12 @@ void view_rectangle(
         {
             if (yC < minY || yC > maxY)
                 continue;
-            for (j = 0, xC = xS, k; j < xSize; j++, xC++)
+            for (j = 0, xC = xS; j < xSize; j++, xC++)
             {
                 if (xC < minX || xC > maxX)
                     continue;
                 else if (outPutArray[i][j])
-                    PRINT_DOT(xC, yC, color);
+                    print_dot(xC, yC, color);
             }
         }
     }
@@ -1054,7 +1187,7 @@ void view_rectangle_padding(
     int picReplaceColorBy,
     bool picUseInvisibleColor,
     int picInvisibleColor,
-    float alpha,
+    int alpha,
     int xMin, int yMin,
     int xMax, int yMax)
 {
@@ -1069,7 +1202,7 @@ void view_rectangle_padding(
 
     uint8_t *charP;
 
-    if (pic == NULL)
+    if (!pic)
         return;
 
     // 矩阵端点整理
@@ -1140,14 +1273,14 @@ void view_rectangle_padding(
                     charP[0] == replaceColor[0] &&
                     charP[1] == replaceColor[1] &&
                     charP[2] == replaceColor[2])
-                    PRINT_DOT(xC, yC, picReplaceColorBy);
+                    print_dot(xC, yC, picReplaceColorBy);
                 else if (picUseInvisibleColor &&
                          charP[0] == invisibleColor[0] &&
                          charP[1] == invisibleColor[1] &&
                          charP[2] == invisibleColor[2])
                     ;
                 else
-                    PRINT_DOT(xC, yC, ((charP[0] << 16) | (charP[1] << 8) | charP[2]));
+                    print_dot(xC, yC, ((charP[0] << 16) | (charP[1] << 8) | charP[2]));
             }
         }
     }
@@ -1174,14 +1307,14 @@ void view_rectangle_padding(
                     charP[0] == replaceColor[0] &&
                     charP[1] == replaceColor[1] &&
                     charP[2] == replaceColor[2])
-                    PRINT_DOT(xC, yC, picReplaceColorBy);
+                    print_dot(xC, yC, picReplaceColorBy);
                 else if (picUseInvisibleColor &&
                          charP[0] == invisibleColor[0] &&
                          charP[1] == invisibleColor[1] &&
                          charP[2] == invisibleColor[2])
                     ;
                 else
-                    PRINT_DOT2(xC, yC, ((charP[0] << 16) | (charP[1] << 8) | charP[2]), alpha);
+                    print_dot2(xC, yC, ((charP[0] << 16) | (charP[1] << 8) | charP[2]), alpha);
             }
         }
     }
@@ -1206,7 +1339,7 @@ void view_rectangle_padding2(
     int picReplaceColorBy,
     bool picUseInvisibleColor,
     int picInvisibleColor,
-    float alpha,
+    int alpha,
     int xMin, int yMin,
     int xMax, int yMax)
 {
@@ -1219,7 +1352,7 @@ void view_rectangle_padding2(
     int xPC, yPC;
     float xPPC, yPPC, xCVal, yCVal;
 
-    if (picMap == NULL)
+    if (!picMap)
         return;
 
     // 矩阵端点整理
@@ -1289,14 +1422,14 @@ void view_rectangle_padding2(
                     picMap[yPC][xPC][0] == replaceColor[0] &&
                     picMap[yPC][xPC][1] == replaceColor[1] &&
                     picMap[yPC][xPC][2] == replaceColor[2])
-                    PRINT_DOT(xC, yC, picReplaceColorBy);
+                    print_dot(xC, yC, picReplaceColorBy);
                 else if (picUseInvisibleColor &&
                          picMap[yPC][xPC][0] == invisibleColor[0] &&
                          picMap[yPC][xPC][1] == invisibleColor[1] &&
                          picMap[yPC][xPC][2] == invisibleColor[2])
                     ;
                 else
-                    PRINT_DOT(xC, yC, ((picMap[yPC][xPC][0] << 16) | (picMap[yPC][xPC][1] << 8) | picMap[yPC][xPC][2]));
+                    print_dot(xC, yC, ((picMap[yPC][xPC][0] << 16) | (picMap[yPC][xPC][1] << 8) | picMap[yPC][xPC][2]));
             }
         }
     }
@@ -1322,14 +1455,14 @@ void view_rectangle_padding2(
                     picMap[yPC][xPC][0] == replaceColor[0] &&
                     picMap[yPC][xPC][1] == replaceColor[1] &&
                     picMap[yPC][xPC][2] == replaceColor[2])
-                    PRINT_DOT2(xC, yC, picReplaceColorBy, alpha);
+                    print_dot2(xC, yC, picReplaceColorBy, alpha);
                 else if (picUseInvisibleColor &&
                          picMap[yPC][xPC][0] == invisibleColor[0] &&
                          picMap[yPC][xPC][1] == invisibleColor[1] &&
                          picMap[yPC][xPC][2] == invisibleColor[2])
                     ;
                 else
-                    PRINT_DOT2(xC, yC, ((picMap[yPC][xPC][0] << 16) | (picMap[yPC][xPC][1] << 8) | picMap[yPC][xPC][2]), alpha);
+                    print_dot2(xC, yC, ((picMap[yPC][xPC][0] << 16) | (picMap[yPC][xPC][1] << 8) | picMap[yPC][xPC][2]), alpha);
             }
         }
     }
@@ -1353,7 +1486,7 @@ void view_parallelogram(
     int xStart, int yStart,
     int xEnd, int yEnd,
     int size, int width,
-    float alpha,
+    int alpha,
     int minX, int minY,
     int maxX, int maxY)
 {
@@ -1440,9 +1573,9 @@ void view_parallelogram(
                     if (xC < minX || xC > maxX)
                         continue;
                     if (sSize == 0)
-                        PRINT_DOT2(xC, yC, color, alpha);
+                        print_dot2(xC, yC, color, alpha);
                     else if (yC < yStart + sSize || xC < xCount + sSize || yC > yEnd2 - sSize || xC > xCount + width - sSize)
-                        PRINT_DOT2(xC, yC, color, alpha);
+                        print_dot2(xC, yC, color, alpha);
                 }
             }
             else
@@ -1452,9 +1585,9 @@ void view_parallelogram(
                     if (xC < minX || xC > maxX)
                         continue;
                     if (sSize == 0)
-                        PRINT_DOT(xC, yC, color);
+                        print_dot(xC, yC, color);
                     else if (yC < yStart + sSize || xC < xCount + sSize || yC > yEnd2 - sSize || xC > xCount + width - sSize)
-                        PRINT_DOT(xC, yC, color);
+                        print_dot(xC, yC, color);
                 }
             }
         }
@@ -1484,10 +1617,10 @@ void view_parallelogram(
                 if (xC < minX || xC > maxX)
                     continue;
                 if (sSize == 0)
-                    PRINT_DOT2(xC, yC, color, alpha);
+                    print_dot2(xC, yC, color, alpha);
                 else if (yC < yStart + sSize || xC < xCount + sSize ||
                          yC > yEnd2 - sSize || xC > xCount + width - sSize)
-                    PRINT_DOT2(xC, yC, color, alpha);
+                    print_dot2(xC, yC, color, alpha);
             }
         }
         else
@@ -1497,10 +1630,10 @@ void view_parallelogram(
                 if (xC < minX || xC > maxX)
                     continue;
                 if (sSize == 0)
-                    PRINT_DOT(xC, yC, color);
+                    print_dot(xC, yC, color);
                 else if (yC < yStart + sSize || xC < xCount + sSize ||
                          yC > yEnd2 - sSize || xC > xCount + width - sSize)
-                    PRINT_DOT(xC, yC, color);
+                    print_dot(xC, yC, color);
             }
         }
     }
@@ -1538,14 +1671,14 @@ void view_printBitMap(
     for (y = yStart; y < yTop; y++)
     {
         for (x = xStart; x < xEnd; x++)
-            PRINT_DOT(x, y, bColor);
+            print_dot(x, y, bColor);
     }
     //正文
     for (byteTotalCount = 0; byteTotalCount < byteTotal && y < yEnd; y++)
     {
         //横向起始跳过点数
         for (x = xStart; x < xLeft; x++)
-            PRINT_DOT(x, y, bColor);
+            print_dot(x, y, bColor);
         //正文
         for (lineByteCount = 0; lineByteCount < map.lineByte; lineByteCount++, byteTotalCount++)
         {
@@ -1553,21 +1686,21 @@ void view_printBitMap(
             for (i = 0, bit = map.bitMap[byteTotalCount]; i < 8 && x < xEnd; i++, x++)
             {
                 if (bit & 0x80)
-                    PRINT_DOT(x, y, fColor);
+                    print_dot(x, y, fColor);
                 else
-                    PRINT_DOT(x, y, bColor);
+                    print_dot(x, y, bColor);
                 bit <<= 1;
             }
         }
         //横向补足点数
         for (; x < xEnd; x++)
-            PRINT_DOT(x, y, bColor);
+            print_dot(x, y, bColor);
     }
     //纵向补足行数
     for (; y < yEnd; y++)
     {
         for (x = xStart; x < xEnd; x++)
-            PRINT_DOT(x, y, bColor);
+            print_dot(x, y, bColor);
     }
 }
 
@@ -1579,7 +1712,7 @@ void view_printBitMap2(
     int xStart, int yStart,
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
-    float alpha,
+    int alpha,
     Ttf_Map map)
 {
     //总字节
@@ -1604,14 +1737,14 @@ void view_printBitMap2(
     for (y = yStart; y < yTop; y++)
     {
         for (x = xStart; x < xEnd; x++)
-            PRINT_DOT2(x, y, bColor, alpha);
+            print_dot2(x, y, bColor, alpha);
     }
     //正文
     for (byteTotalCount = 0; byteTotalCount < byteTotal && y < yEnd; y++)
     {
         //横向起始跳过点数
         for (x = xStart; x < xLeft; x++)
-            PRINT_DOT(x, y, bColor);
+            print_dot(x, y, bColor);
         //正文
         for (lineByteCount = 0; lineByteCount < map.lineByte; lineByteCount++, byteTotalCount++)
         {
@@ -1619,21 +1752,21 @@ void view_printBitMap2(
             for (i = 0, bit = map.bitMap[byteTotalCount]; i < 8 && x < xEnd; i++, x++)
             {
                 if (bit & 0x80)
-                    PRINT_DOT2(x, y, fColor, alpha);
+                    print_dot2(x, y, fColor, alpha);
                 else
-                    PRINT_DOT(x, y, bColor);
+                    print_dot(x, y, bColor);
                 bit <<= 1;
             }
         }
         //横向补足点数
         for (; x < xEnd; x++)
-            PRINT_DOT(x, y, bColor);
+            print_dot(x, y, bColor);
     }
     //纵向补足行数
     for (; y < yEnd; y++)
     {
         for (x = xStart; x < xEnd; x++)
-            PRINT_DOT(x, y, bColor);
+            print_dot(x, y, bColor);
     }
 }
 
@@ -1650,8 +1783,10 @@ void view_printBitMap2(
  */
 void view_string(int fColor, int bColor, char *str, int xStart, int yStart, int type, int space)
 {
+#if (MAKE_FREETYPE)
     int ret;
     Ttf_Map map;
+
     while (*str)
     {
         ret = ttf_getMapByUtf8(ViewTTF, str, type, &map);
@@ -1664,6 +1799,7 @@ void view_string(int fColor, int bColor, char *str, int xStart, int yStart, int 
             str += ret;
         }
     }
+#endif
 }
 
 /*
@@ -1686,8 +1822,9 @@ void view_string_rectangle(
     int strWidth, int strHight,
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
-    int type, int space, float alpha)
+    int type, int space, int alpha)
 {
+#if (MAKE_FREETYPE)
     int ret;
     Ttf_Map map;
 
@@ -1715,6 +1852,7 @@ void view_string_rectangle(
             str += ret;
         }
     }
+#endif
 }
 
 /*
@@ -1742,14 +1880,14 @@ int view_string_rectangleLineWrap(
     int xScreenEnd, int yScreenEnd,
     int type,
     int xSpace, int ySpace,
-    float alpha,
+    int alpha,
     int *retWordPerLine,
     int *retLine)
 {
+#if (MAKE_FREETYPE)
     int ret;
     int xC = xStart, yC = yStart;
     int xE = xStart + strWidth, yE = yStart + strHight;
-
     Ttf_Map map;
 
     int typeHeight = type / 10, typeWidth = type / 10;
@@ -1836,6 +1974,9 @@ int view_string_rectangleLineWrap(
         *rwpl = str - strOld;
 
     return (str - strStart);
+#else
+    return strlen(str);
+#endif
 }
 
 /*
@@ -1859,11 +2000,12 @@ int view_string_rectangleCR(
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
     int type, int space,
-    int xErr, float alpha)
+    int xErr, int alpha)
 {
+#if (MAKE_FREETYPE)
     int xMov = xErr, typeHeight = type / 10;
-    int ret, strCount = 0, retVal = xErr;
-
+    int ret;
+    int strCount = 0, retVal = xErr;
     Ttf_Map map;
 
     if (xStart > xScreenEnd ||
@@ -1901,22 +2043,10 @@ int view_string_rectangleCR(
             strCount = 0;
         }
     }
-
     return retVal;
-}
-
-//--------------------  UI系统初始化 --------------------
-
-void view_init(void)
-{
-    //配置文件初始化
-    viewConfig_init();
-    //viewSource初始化
-    viewSource_init();
-    //viewColor初始化
-    viewColor_init();
-    //平台系统初始化
-    PLAT_INIT();
+#else
+    return strlen(str) * type / 10;
+#endif
 }
 
 //--------------------  viewTool add/insert/remove --------------------
@@ -1930,7 +2060,7 @@ void view_add(View_Struct *parentView, View_Struct *view, bool front)
 {
     View_Struct *vsTemp;
 
-    if (parentView == NULL || view == NULL)
+    if (!parentView || !view)
         return;
 
     //互斥保护
@@ -1989,7 +2119,7 @@ void view_insert(View_Struct *nodeView, View_Struct *view, bool front)
 {
     View_Struct *vsTemp, *vsParent;
 
-    if (nodeView == NULL || view == NULL || nodeView->parent == NULL)
+    if (!nodeView || !view || !nodeView->parent)
         return;
 
     vsParent = nodeView->parent;
@@ -2056,7 +2186,7 @@ void view_remove(View_Struct *view)
 {
     View_Struct *vsTemp, *vsParent;
 
-    if (view == NULL || view->parent == NULL)
+    if (!view || !view->parent)
         return;
 
     vsParent = view->parent;
@@ -2117,15 +2247,57 @@ void view_delete(View_Struct *view)
     view_add(&viewTrash, view, false);
 }
 
-//--------------------  viewTool is ? --------------------
-
 bool view_isChild(View_Struct *parent, View_Struct *child)
 {
-    if (parent == NULL || child == NULL)
+    if (!parent || !child)
         return false;
     if (parent == child->parent)
         return true;
     return view_isChild(parent, child->parent);
+}
+
+#define FIND_LINK(o, a, n)      \
+    if (a->number > n)          \
+    {                           \
+        while (a)               \
+        {                       \
+            if (a->number == n) \
+                return a;       \
+            a = a->last;        \
+        }                       \
+    }                           \
+    else if (a->number < n)     \
+    {                           \
+        while (a)               \
+        {                       \
+            if (a->number == n) \
+                return a;       \
+            a = a->next;        \
+        }                       \
+    }                           \
+    return o
+
+//定位到 view 链表中的一员
+View_Struct *view_num(View_Struct *view, int n)
+{
+    View_Struct *vsTemp = view;
+    int tN;
+    if (n < 0)
+    {
+        if (n < VRNT_NEXT)
+            tN = view->number + (VRNT_NEXT - n);
+        else if (n == VRNT_NEXT)
+            tN = view->number + 1;
+        else if (n < VRNT_LAST)
+            tN = view->number - (VRNT_LAST - n);
+        else
+            tN = view->number - 1;
+        FIND_LINK(view, vsTemp, tN);
+    }
+    else
+    {
+        FIND_LINK(view, vsTemp, n);
+    }
 }
 
 //--------------------  viewTool focus --------------------
@@ -2148,7 +2320,7 @@ View_Focus *view_focusInit(View_Struct *topView, View_Struct *cView, ViewValue_F
 
 void view_focusRecover(View_Focus *focus)
 {
-    if (focus == NULL)
+    if (!focus)
         return;
     if (focus->view)
     {
@@ -2159,7 +2331,7 @@ void view_focusRecover(View_Focus *focus)
 
 void view_focusNote(View_Focus *focus, View_Struct *view)
 {
-    if (focus == NULL)
+    if (!focus)
         return;
     view_focusRecover(focus);
     if (view)
@@ -2182,7 +2354,7 @@ View_Struct *view_focusSearch(View_Struct *view)
 {
     View_Struct *vsTemp = NULL, *vsTemp2 = NULL;
 
-    if (view == NULL || view->disable || view->invisible)
+    if (!view || view->disable || view->invisible)
         return NULL;
 
     vsTemp = view;
@@ -2223,9 +2395,9 @@ ViewCallBack view_focusEvent(View_Focus *focus, ViewFocus_Event event)
 {
     View_Struct *vsTemp = NULL, *vsTemp2 = NULL;
 
-    if (focus == NULL || focus->topView == NULL)
+    if (!focus || !focus->topView)
         return NULL;
-    if (focus->view == NULL)
+    if (!focus->view)
     {
         focus->view = focus->topView->view;
         goto FOCUS_ENENT_ENTER;
@@ -2298,7 +2470,7 @@ ViewCallBack view_focusEvent(View_Focus *focus, ViewFocus_Event event)
                 return NULL;
             }
 
-            if (vsTemp->next == NULL)
+            if (!vsTemp->next)
             {
                 while (vsTemp->last)
                     vsTemp = vsTemp->last;
@@ -2333,7 +2505,7 @@ ViewCallBack view_focusEvent(View_Focus *focus, ViewFocus_Event event)
                 return NULL;
             }
 
-            if (vsTemp->last == NULL)
+            if (!vsTemp->last)
             {
                 while (vsTemp->next)
                     vsTemp = vsTemp->next;
@@ -2390,52 +2562,6 @@ FOCUS_ENENT_ENTER:
 }
 
 //--------------------  viewTool draw --------------------
-
-#define F_NEXT(a) a = a->next
-#define F_LAST(a) a = a->last
-#define FIND_LINK(o, a, n)      \
-    if (a->number > n)          \
-    {                           \
-        while (a)               \
-        {                       \
-            if (a->number == n) \
-                return a;       \
-            F_LAST(a);          \
-        }                       \
-    }                           \
-    else if (a->number < n)     \
-    {                           \
-        while (a)               \
-        {                       \
-            if (a->number == n) \
-                return a;       \
-            F_NEXT(a);          \
-        }                       \
-    }                           \
-    return o
-
-//定位到 view 链表中的一员
-View_Struct *view_num(View_Struct *view, int n)
-{
-    View_Struct *vsTemp = view;
-    int tN;
-    if (n < 0)
-    {
-        if (n < VRNT_NEXT)
-            tN = view->number + (VRNT_NEXT - n);
-        else if (n == VRNT_NEXT)
-            tN = view->number + 1;
-        else if (n < VRNT_LAST)
-            tN = view->number - (VRNT_LAST - n);
-        else
-            tN = view->number - 1;
-        FIND_LINK(view, vsTemp, tN);
-    }
-    else
-    {
-        FIND_LINK(view, vsTemp, n);
-    }
-}
 
 void _viewTool_viewLocal(char drawSync, View_Struct *view, int width, int height, int xy[2][2])
 {
@@ -2589,7 +2715,7 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
     //数组数据有变动,重新初始化结构体
     if (value->type != vps->type ||
         value->vSize != vps->vSize ||
-        vps->valueOutput == NULL)
+        !vps->valueOutput)
     {
         if (value->vSize == 0)
             return NULL;
@@ -2652,7 +2778,7 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             count += ret;
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
-        vps->valueOutput[count - 1] = 
+        vps->valueOutput[count - 1] =
             (i == 1 && value->param[0]) ? value->param[0] : 0;
         break;
     case VT_DOUBLE_ARRAY:
@@ -2666,7 +2792,7 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             count += ret;
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
-        vps->valueOutput[count - 1] = 
+        vps->valueOutput[count - 1] =
             (i == 1 && value->param[0]) ? value->param[0] : 0;
         break;
     case VT_BOOL_ARRAY:
@@ -2678,7 +2804,7 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             count += ret;
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
-        vps->valueOutput[count - 1] = 
+        vps->valueOutput[count - 1] =
             (i == 1 && value->param[0]) ? value->param[0] : 0;
         break;
     case VT_STRING_ARRAY:
@@ -2697,7 +2823,7 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             count += ret;
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
-        vps->valueOutput[count - 1] = 
+        vps->valueOutput[count - 1] =
             (i == 1 && value->param[0]) ? value->param[0] : 0;
         break;
     default:
@@ -3201,17 +3327,21 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
         //获取图片数据
         if (view->picPath_bak != view->picPath)
         {
+            //释放现在的内存
             if (view->picMap)
-                bmp_mapRelease(view->picMap, view->picWidth, view->picHeight);
+                picMap_release(view->picMap, view->picWidth, view->picHeight);
             if (view->pic)
                 free(view->pic);
+            //读取新图片
             view->pic = bmp_get(view->picPath, &view->picWidth, &view->picHeight, &view->picPB);
+            //获取指针网格
             if (view->pic)
             {
-                view->picMap = bmp_mapInit(view->pic, view->picWidth, view->picHeight, view->picPB);
+                view->picMap = picMap_init(&view->pic, view->picWidth, view->picHeight, &view->picPB);
                 view->picPath_bak = view->picPath;
             }
-            else //找不到图片,下次不找了...
+            //找不到图片,下次不找了...
+            else
                 view->picPath_bak = view->picPath = NULL;
         }
         //输出范围计算
@@ -3265,6 +3395,7 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
 
         if (view->valueOutput)
         {
+#if (MAKE_FREETYPE)
             //----- 输出方式一: 自动换行输出 -----
             if (view->valueYEdge > 0)
             {
@@ -3377,6 +3508,7 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                         view->valueType, view->valueXEdge, view->valueAlpha);
                 }
             }
+#endif
         }
     }
 
@@ -3659,7 +3791,7 @@ int view_draw(
     int xyLimitVsTemp[2][2];
     int ret;
 
-    if (view == NULL)
+    if (!view)
         return CALLBACK_OK;
 
     // printf("view_draw: %s \r\n", view->name?view->name:"NULL");
@@ -3825,7 +3957,7 @@ ViewCallBack view_touchLocal(int xy[2], View_Struct *view, View_Struct **retView
     ViewCallBack ret = NULL;
     View_Struct *vsTemp = NULL;
 
-    if (xy == NULL || view == NULL || view->disable)
+    if (!xy || !view || view->disable)
         return NULL;
 
     //等待绘制结束
@@ -3910,7 +4042,7 @@ int _input_comm_callBack(View_Struct *view, void *object, View_Focus *focus, Vie
     View_Struct *vsParent, *vsTemp;
     int movMax = 0;
     _InputBackup_Struct *ibs;
-    float alpha;
+    int alpha;
 
     // printf("-- FUN CALLBACK-- _input_comm_callBack : %d\r\n", event->move);
 
@@ -4316,14 +4448,14 @@ int _input_list2_callBack(View_Struct *view, void *object, View_Focus *focus, Vi
 int _input_viewStart(View_Struct *view, void *object, View_Focus *focus, ViewButtonTouch_Event *event)
 {
     View_Struct *vsFocus, *vsTemp;
-    float alpha;
+    int alpha;
     int valueType;
     _InputBackup_Struct *ibs;
 
     ibs = view->privateData;
     valueType = ibs->contentMinType * 10;
 
-    if (focus && focus->view->backView == NULL && focus->view->parent == view)
+    if (focus && !focus->view->backView && focus->view->parent == view)
     {
         vsFocus = focus->view;
         switch ((((_InputBackup_Struct *)(view->privateData)))->type)
@@ -4457,7 +4589,7 @@ void view_input(
     char *valueStringPoint = NULL;
     char strDemo[] = "%.8lf";
 
-    if (backView == NULL || focus == NULL || vsParent == NULL)
+    if (!backView || !focus || !vsParent)
         return;
     //布置一个全屏的 view
     vs = (View_Struct *)calloc(1, sizeof(View_Struct));
@@ -4483,7 +4615,7 @@ void view_input(
     // vs->viewEnd = (ViewCallBack)&_input_viewEnd;
 
     //type 0: 仅提示(暂不支持数组类数据的输入)
-    if (value == NULL ||
+    if (!value ||
         value->type == VT_BOOL ||
         value->type == VT_STRING_ARRAY ||
         value->type == VT_INT_ARRAY ||
@@ -4510,6 +4642,7 @@ void view_input(
         vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 5; //四周保持5的间距
         vsTemp->valueYEdge = 6;                             //自动换行,行间距5
 
+#if (MAKE_FREETYPE)
         ttf_getSizeByUtf8_multiLine(
             ViewTTF,
             label,
@@ -4539,6 +4672,12 @@ void view_input(
                 vsTemp->valueType = 160;
             }
         }
+#else
+        vsTemp->valueTopEdge = vsTemp->valueBottomEdge = 3;
+        vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 3; //四周保持5的间距
+        vsTemp->valueYEdge = 4;
+        vsTemp->valueType = 200;
+#endif
 
         vsTemp->callBack = (ViewCallBack)&_input_comm_callBack;
         vsTemp->enMoveEvent = true;
@@ -5024,9 +5163,9 @@ void view_input(
 //根据txt长度自动推荐字体,最小返回280
 int view_getType(char *text, int width, int xEdge)
 {
-    int retWidth;
     int retValueType = 240;
-
+#if (MAKE_FREETYPE)
+    int retWidth;
     retValueType = 480;
     retWidth = ttf_getSizeByUtf8(ViewTTF, text, 480, xEdge, NULL);
     if (retWidth > width)
@@ -5043,6 +5182,6 @@ int view_getType(char *text, int width, int xEdge)
             }
         }
     }
-
+#endif
     return retValueType;
 }
