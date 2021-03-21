@@ -19,13 +19,13 @@ void viewSrc_init(void)
 #endif
 
     //控件参数
-    viewValue_reset(&ViewSrc.Common_Rad, "Common_Rad", VT_INT, 1, VIEW_RESOLUTION / 24);
-    viewValue_reset(&ViewSrc.Common_ContentType, "Common_ContentType", VT_INT, 1, VIEW_RESOLUTION_PRINT);
-    viewValue_reset(&ViewSrc.Common_LabelType, "Common_LabelType", VT_INT, 1, VIEW_RESOLUTION_PRINT * 3 / 4);
+    viewValue_reset(&ViewSrc.Shape_Rad, "Shape_Rad", VT_INT, 1, VIEW_RESOLUTION / 24);
+    viewValue_reset(&ViewSrc.Content_Type, "Content_Type", VT_INT, 1, VIEW_RESOLUTION_PRINT);
+    viewValue_reset(&ViewSrc.Label_Size, "Label_Size", VT_INT, 1, VIEW_RESOLUTION_PRINT * 3 / 4);
     printf("ViewSrc print type : label/%d content/%d rad/%d\n",
-           ViewSrc.Common_LabelType.value.Int,
-           ViewSrc.Common_ContentType.value.Int,
-           ViewSrc.Common_Rad.value.Int);
+           ViewSrc.Label_Size.value.Int,
+           ViewSrc.Content_Type.value.Int,
+           ViewSrc.Shape_Rad.value.Int);
 
     //API
     viewValue_reset(&ViewSrc.Api_Button_Enter, "Api_Button_Enter", VT_STRING, 1, "确认");

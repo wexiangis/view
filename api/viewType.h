@@ -37,7 +37,7 @@ typedef enum
 } ViewValue_Type;
 
 //========== 类型+名称+数据存储 ==========
-#define VIEW_VALUE_NAME_LEN 64 //变量名称限长32字节
+#define VIEW_VALUE_NAME_LEN 32 //变量名称限长32字节
 typedef struct ViewValueFormat
 {
     //[互斥锁]
@@ -228,33 +228,50 @@ typedef void (*DrawCallBack)(void *own, int xyLimit[2][2]);
 typedef int (*FocusCallBack)(void *own, void *focus, int xyLimit[2][2]);
 
 //========== 控件参数 ==========
+
+//view->width、height参数配置
 typedef enum
 {
-    VWHT_MATCH = -10000,  //和父控件同长, VWHT_MATCH*n-m 表示父控件的 m/n 长 // 注意: n,m < 100
-    VWHT_FULL = -1000000, //和屏幕同长, VWHT_FULL*n-m 表示屏幕的 m/n 长     // 注意: n,m < 100
-} ViewWidthHeight_Type;
+    //和父控件同长, VWHT_MATCH*n-m 表示父控件的 m/n 长 // 注意: n,m < 100
+    VWHT_MATCH = -10000,
+    //和屏幕同长, VWHT_FULL*n-m 表示屏幕的 m/n 长     // 注意: n,m < 100
+    VWHT_FULL = -1000000,
+} ViewWH_Type;
 
+//view->rNumber参数配置
 typedef enum
 {
     VRNT_PARENT = 0,
-    VRNT_LAST = -10000,   //相对对象为前一个, VRNT_LAST-n 表示前 n 个  // 注意: n < 100
-    VRNT_NEXT = -1000000, //相对对象为后一个, VRNT_NEXT-n 表示后 n 个  // 注意: n < 100
+    //相对对象为前一个, VRNT_LAST-n 表示前 n 个  // 注意: n < 100
+    VRNT_LAST = -10000,
+    //相对对象为后一个, VRNT_NEXT-n 表示后 n 个  // 注意: n < 100
+    VRNT_NEXT = -1000000,
 } ViewWRelativeNumber_Type;
 
+//view->rType参数配置
 typedef enum
 {
+    VRT_TOP_LEFT = 0x0,
     VRT_TOP = 0x01,
     VRT_BOTTOM = 0x03, //和 VRT_TOP 互斥使用
     VRT_LEFT = 0x10,
     VRT_RIGHT = 0x30, //和 VRT_LEFT 互斥使用
 } ViewRelative_Type;
 
+//view->textSideX/Y 赋值
+typedef enum
+{
+    VTST_CENTER = 0,       //居中(默认)
+    VTST_LEFT_TOP = 1,     //靠在左边(textSideX)或上边(textSideY)
+    VSTT_RIGHT_BOTTOM = 2, //靠在右边(textSideX)或下边边(textSideY)
+} ViewTextSide_Type;
+
 typedef struct
 {
-    char *valueOutput;
+    char *textOutput;
     int type;
     int vSize;
-    int valueOutputLen;
+    int textOutputLen;
 } ViewPrint_Struct;
 
 //========== view 结构 ==========
@@ -312,16 +329,16 @@ typedef struct ViewStruct
     //宏定义: VWHT_FULL, VWHT_FULL*n : 屏幕长,屏幕长的1/n
     int width, height;
 
-    //指定相对 view 的序号(从1数起),为0时相对父控件
-    //宏定义: VRNT_LAST, VRNT_LAST*n : 前一个,前 n 个
-    //宏定义: VRNT_NEXT, VRNT_NEXT*n : 后一个,后 n 个
-    int rNumber;
-
     //相对位置关系,用 VRT_TOP/VRT_BOTTOM 和 VRT_LEFT/VRT_RIGHT 组合
     //      例如左上: rType = VRT_LEFT | VRT_TOP;
     //      例如右下: rType = VRT_RIGHT | VRT_BOTTOM;
     //当 rType = 0 (也就是不填), 判定当前 view 的坐标和 rNumber 指定的 view 的左上角坐标一致
     int rType;
+
+    //指定相对 view 的序号(从1数起),为0时相对父控件
+    //宏定义: VRNT_LAST, VRNT_LAST*n : 前一个,前 n 个
+    //宏定义: VRNT_NEXT, VRNT_NEXT*n : 后一个,后 n 个
+    int rNumber;
 
     //相对偏移量
     //相对对象为其它 view 时(rNumber != 0): 下面数值为外偏移量,也就是靠在一起时的间距
@@ -372,8 +389,8 @@ typedef struct ViewStruct
     ViewShape_Union shape;
 
     //相对于控件在4个方向上的缩进
-    int shapeTopEdge, shapeBottomEdge;
-    int shapeLeftEdge, shapeRightEdge;
+    int shapeEdgeTop, shapeEdgeBottom;
+    int shapeEdgeLeft, shapeEdgeRight;
 
     //形状的真正绘制范围 [系统赋值]
     int shapeAbsXY[2][2];
@@ -390,8 +407,8 @@ typedef struct ViewStruct
     char *picPathBakup;
 
     //文字输出框相对于控件在4个方向上的缩进,用以确定输出范围
-    int picTopEdge, picBottomEdge;
-    int picLeftEdge, picRightEdge;
+    int picEdgeTop, picEdgeBottom;
+    int picEdgeLeft, picEdgeRight;
 
     //图片实际输出范围 [系统赋值]
     int picAbsXY[2][2];
@@ -410,47 +427,46 @@ typedef struct ViewStruct
     //---------- 内容 ----------
 
     //数据
-    ViewValue_Format *value;
+    ViewValue_Format *text;
 
-    //备用数据(比如 value 要输出字符串内容, valueBackup 来备份其整形值)
-    ViewValue_Format *valueBackup;
+    //备用数据(比如 text 要输出字符串内容, textBakup 来备份其整形值)
+    ViewValue_Format *textBakup;
 
     //数据输出缓冲区 [系统赋值]
-    ViewPrint_Struct valuePrint;
+    ViewPrint_Struct textPrint;
 
     //最终输出的字符串指针 [系统赋值]
-    char *valueOutput;
+    char *textOutput;
 
     //文字输出框相对于控件在4个方向上的缩进,用以确定输出范围
-    int valueTopEdge, valueBottomEdge;
-    int valueLeftEdge, valueRightEdge;
+    int textEdgeTop, textEdgeBottom;
+    int textEdgeLeft, textEdgeRight;
 
     //文字输出范围 [系统赋值]
-    int valueAbsXY[2][2];
+    int textAbsXY[2][2];
 
     //文字在输出范围内的 横/纵向 相对位置 0/居中(默认) 1/向上对齐 2/向下对齐
-    int valueHorType, valueVerType;
+    ViewTextSide_Type textSideX, textSideY;
 
     //字体代号,例如:160,240,320,400,480,560,640 前两位表示字号,最后位表示线宽(0表示最细)
-    int valueType;
+    int textSize;
 
     //字颜色
-    uint32_t valueColor;
+    uint32_t textColor;
 
     //横向字间距
-    int valueXEdge;
-
+    int textEdgeX;
     //纵向字间距,>0时启用自动换行,并作为行间隔
-    int valueYEdge;
+    int textEdgeY;
 
-    //滚动(和 valueEdge 互斥使用) >0时启用并作为平移像素量
+    //滚动(和 textEdge 互斥使用) >0时启用并作为平移像素量
     int scroll;
     //计数,当前平移量 = scrollCount * scroll [系统赋值]
     int scrollCount;
     //多少个绘制周期算一次计数
     int scrollPeriod;
     //计数,满 scrollPeriod 时 scrollCount+1 [系统赋值]
-    int scrollCount2;
+    int scrollPeriodCount;
 
     //---------- 下划线 ----------
 
@@ -463,14 +479,10 @@ typedef struct ViewStruct
 
     //描边,>0时启用,并作为描边的宽度
     int side;
-
     //描边的颜色
     uint32_t sideColor;
 
     //---------- 其它标注 ----------
-
-    //右上角特殊标记,例如未读的邮件
-    bool mark;
 
     //系统滴答时钟,省去回调函数内周期任务的计时 [系统赋值]
     int tickMs;
@@ -587,14 +599,9 @@ typedef struct ViewButtonTouchEvent
 //========== 基本数据的 生成/重设/释放 方法 ==========
 
 ViewValue_Format *viewValue_init(
-    char *name,
-    ViewValue_Type type,
-    int valueNum, ...);
+    char *name, ViewValue_Type type, int valueNum, ...);
 ViewValue_Format *viewValue_reset(
-    ViewValue_Format *vvf,
-    char *name,
-    ViewValue_Type type,
-    int valueNum, ...);
+    ViewValue_Format *vvf, char *name, ViewValue_Type type, int valueNum, ...);
 void viewValue_release(ViewValue_Format *vvf);
 bool viewValue_compare(ViewValue_Format *vvf, ViewValue_Format *vvfArray, int *retNum);
 int viewValue_find(ViewValue_Format *vvfArray, ...);

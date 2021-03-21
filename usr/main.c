@@ -90,7 +90,7 @@ int main(void)
     DELAY_INIT;
 
     //UI系统初始化(底层平台初始化)
-    view_init();
+    viewApi_init();
 
     argb = png_get("./usr/src/signal.png", &w, &h, &pb);
 
@@ -121,7 +121,7 @@ int main(void)
     DELAY_INIT;
 
     //UI系统初始化(底层平台初始化)
-    view_init();
+    viewApi_init();
 
     //view初始化
     vsMain = view_main_init();

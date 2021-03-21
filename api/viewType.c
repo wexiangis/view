@@ -3,7 +3,14 @@
 
 //========== 基本数据的 生成/重设/释放 方法 ==========
 
-///
+/*
+ *  通用数据类型初始化
+ *  参数:
+ *      name: 最大 VIEW_VALUE_NAME_LEN 字节的view名称存储区
+ *      type: 数据类型
+ *      valueNum: 告知后面的变长参数的数据个数
+ *      ...: 根据 type 类型填入特定类型的数据,注意浮点一定要加小数点,如3写成3.0或3lf
+ */
 ViewValue_Format *viewValue_init(char *name, ViewValue_Type type, int valueNum, ...)
 {
     ViewValue_Format *vvf;
@@ -835,15 +842,14 @@ void _viewValue_save(FILE *fd, ViewValue_Format *vvf)
                 vvf->name, 1, vvf->value.Bool ? 'T' : 'F');
         break;
     case VT_INT:
-#if(VVF_SL_SHOW_HEX)
+#if (VVF_SL_SHOW_HEX)
         fprintf(fd, "# %s VT_INT %d\n%06X\\\n",
                 vvf->name, 1, vvf->value.Int);
-        break;
 #else
         fprintf(fd, "# %s VT_INT %d\n%d\\\n",
                 vvf->name, 1, vvf->value.Int);
-        break;
 #endif
+        break;
     case VT_DOUBLE:
         fprintf(fd, "# %s VT_DOUBLE %d\n%.8lf\\\n",
                 vvf->name, 1, vvf->value.Double);
@@ -862,7 +868,7 @@ void _viewValue_save(FILE *fd, ViewValue_Format *vvf)
         fprintf(fd, "# %s VT_INT_ARRAY %d\n",
                 vvf->name, (int)(vvf->vSize / sizeof(int)));
         for (j = 0; j < vvf->vSize / sizeof(int); j++)
-#if(VVF_SL_SHOW_HEX)
+#if (VVF_SL_SHOW_HEX)
             fprintf(fd, "%06X\\\n", vvf->value.IntArray[j]);
 #else
             fprintf(fd, "%d\\\n", vvf->value.IntArray[j]);
@@ -1153,7 +1159,7 @@ int viewValue_load(char *filePath, ViewValue_Format *array, int arrayLen)
                     case VT_INT:
                         if (fgets(line, LOAD_LINE_SIZE, fd) == NULL)
                             break;
-#if(VVF_SL_SHOW_HEX)
+#if (VVF_SL_SHOW_HEX)
                         sscanf(line, "%X", &vvfPoint->value.Int);
 #else
                         sscanf(line, "%d", &vvfPoint->value.Int);
@@ -1195,7 +1201,7 @@ int viewValue_load(char *filePath, ViewValue_Format *array, int arrayLen)
                             memset(line, 0, LOAD_LINE_SIZE);
                             if (fgets(line, LOAD_LINE_SIZE, fd) == NULL)
                                 break;
-#if(VVF_SL_SHOW_HEX)
+#if (VVF_SL_SHOW_HEX)
                             sscanf(line, "%X", &vvfPoint->value.IntArray[i]);
 #else
                             sscanf(line, "%d", &vvfPoint->value.IntArray[i]);

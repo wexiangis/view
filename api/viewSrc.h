@@ -10,9 +10,9 @@
 typedef struct ViewSrcType
 {
     //控件参数
-    ViewValue_Format Common_Rad;         //圆角
-    ViewValue_Format Common_LabelType;   //标签字体大小
-    ViewValue_Format Common_ContentType; //正文字体大小
+    ViewValue_Format Shape_Rad;         //圆角
+    ViewValue_Format Label_Size;   //标签字体大小
+    ViewValue_Format Content_Type; //正文字体大小
     //API
     ViewValue_Format Api_Button_Enter;
     ViewValue_Format Api_Button_Return;

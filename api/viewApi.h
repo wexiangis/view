@@ -15,7 +15,7 @@
 
 //--------------------  UI系统初始化 --------------------
 
-void view_init(void);
+void viewApi_init(void);
 
 //--------------------  基本画图接口 --------------------
 
@@ -51,6 +51,15 @@ uint32_t *view_getPic(char *picPath, int *width, int *height, int *pb);
  *  把半透明红色写作0x80FF0000,而这个整形的4字节内存顺序即为BGRA,
  * 
  */
+
+//-------------------- 快速节点配置 --------------------
+
+View_Struct *view_init(
+    char *name,
+    int width,
+    int height,
+    int rType,
+    int rNumber);
 
 //---------------------- 链表操作 ---------------------
 

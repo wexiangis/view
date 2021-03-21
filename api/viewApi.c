@@ -9,17 +9,37 @@ typedef union {
     uint8_t rgb[VIEW_Y_SIZE][VIEW_X_SIZE][VIEW_PB];
 } View_Map;
 
+//公共map指针
 static View_Map *view_map = NULL;
+
+//公共顶view
+static View_Struct ViewCommonParent = {
+    .name = "commonParent",
+    .width = VIEW_X_SIZE,
+    .height = VIEW_Y_SIZE,
+    .absWidth = VIEW_X_SIZE,
+    .absHeight = VIEW_Y_SIZE,
+    .absXY = {{0, 0}, {VIEW_X_END, VIEW_Y_END}},
+    .drawSync = 1,
+};
+
+//纵向输入列表最后选中项的序号(从0数起)
+static int viewInputSelectNumber = 0;
+
+//垃圾桶
+static View_Struct viewTrash = {
+    .name = "viewTrash",
+};
 
 //--------------------  UI系统初始化 --------------------
 
-void view_init(void)
+void viewApi_init(void)
 {
     //平台初始化,获取屏幕缓存
     view_map = (View_Map *)VIEW_MAP_INIT();
     if (!view_map)
     {
-        fprintf(stderr, "view_init: VIEW_MAP_INIT failed !!\r\n");
+        fprintf(stderr, "viewApi_init: VIEW_MAP_INIT failed !!\r\n");
         exit(-1);
     }
     //配置文件初始化
@@ -190,24 +210,25 @@ uint32_t *view_getPic(char *picPath, int *width, int *height, int *pb)
     return (uint32_t *)ret;
 }
 
-//公共顶view
-static View_Struct ViewCommonParent = {
-    .name = "commonParent",
-    .width = VIEW_X_SIZE,
-    .height = VIEW_Y_SIZE,
-    .absWidth = VIEW_X_SIZE,
-    .absHeight = VIEW_Y_SIZE,
-    .absXY = {{0, 0}, {VIEW_X_END, VIEW_Y_END}},
-    .drawSync = 1,
-};
+//-------------------- 快速节点配置 --------------------
 
-//纵向输入列表最后选中项的序号(从0数起)
-static int viewInputSelectNumber = 0;
+View_Struct *view_init(
+    char *name,
+    int width,
+    int height,
+    int rType,
+    int rNumber)
+{
+    View_Struct *vs = (View_Struct *)calloc(1, sizeof(View_Struct));
+    strcpy(vs->name, name);
+    vs->width = width;
+    vs->height = height;
+    vs->rType = rType;
+    vs->rNumber = rNumber;
+    return vs;
+}
 
-//垃圾桶
-static View_Struct viewTrash = {
-    .name = "viewTrash",
-};
+//-------------------- 垃圾桶系统 --------------------
 
 //垃圾释放
 void viewTrash_clean(void)
@@ -233,15 +254,15 @@ void viewTrash_clean(void)
             free(vsThis->privateData);
 
         //数据资源释放
-        if (vsThis->value && !viewSrc_compare(vsThis->value))
+        if (vsThis->text && !viewSrc_compare(vsThis->text))
         {
-            viewValue_release(vsThis->value);
-            vsThis->value = NULL;
+            viewValue_release(vsThis->text);
+            vsThis->text = NULL;
         }
-        if (vsThis->valueBackup && !viewSrc_compare(vsThis->valueBackup))
+        if (vsThis->textBakup && !viewSrc_compare(vsThis->textBakup))
         {
-            viewValue_release(vsThis->valueBackup);
-            vsThis->valueBackup = NULL;
+            viewValue_release(vsThis->textBakup);
+            vsThis->textBakup = NULL;
         }
         //图片内存释放
         if (vsThis->pic)
@@ -250,10 +271,10 @@ void viewTrash_clean(void)
             vsThis->pic = NULL;
         }
         //文字输出缓冲区释放
-        if (vsThis->valuePrint.valueOutput)
+        if (vsThis->textPrint.textOutput)
         {
-            free(vsThis->valuePrint.valueOutput);
-            vsThis->valuePrint.valueOutput = NULL;
+            free(vsThis->textPrint.textOutput);
+            vsThis->textPrint.textOutput = NULL;
         }
         //含有子 view
         if (vsThis->view)
@@ -2227,7 +2248,7 @@ void _viewTool_viewLocal(char drawSync, View_Struct *view, int width, int height
     view->drawSync = drawSync;
 }
 
-char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
+char *_viewTool_textPrint(ViewValue_Format *value, ViewPrint_Struct *vps)
 {
     int i, count, ret;
     char strDemoIntArray[] = "%01d,";
@@ -2238,36 +2259,36 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
     //数组数据有变动,重新初始化结构体
     if (value->type != vps->type ||
         value->vSize != vps->vSize ||
-        !vps->valueOutput)
+        !vps->textOutput)
     {
         if (value->vSize == 0)
             return NULL;
 
         vps->type = value->type;
         vps->vSize = value->vSize;
-        if (vps->valueOutput)
-            free(vps->valueOutput);
-        vps->valueOutput = NULL;
+        if (vps->textOutput)
+            free(vps->textOutput);
+        vps->textOutput = NULL;
 
         switch (value->type)
         {
         case VT_INT_ARRAY:
-            vps->valueOutput = (char *)calloc(value->vSize / sizeof(int) * 32, sizeof(char));
+            vps->textOutput = (char *)calloc(value->vSize / sizeof(int) * 32, sizeof(char));
             break;
         case VT_DOUBLE_ARRAY:
-            vps->valueOutput = (char *)calloc(value->vSize / sizeof(double) * 32, sizeof(char));
+            vps->textOutput = (char *)calloc(value->vSize / sizeof(double) * 32, sizeof(char));
             break;
         case VT_BOOL_ARRAY:
-            vps->valueOutput = (char *)calloc(value->vSize / sizeof(bool) * 8, sizeof(char));
+            vps->textOutput = (char *)calloc(value->vSize / sizeof(bool) * 8, sizeof(char));
             break;
         case VT_STRING_ARRAY:
             for (i = 0, count = 0; i < value->vSize / sizeof(char *); i += 1)
                 count += strlen(value->value.StringArray[i]) + 1;
-            vps->valueOutputLen = count;
-            vps->valueOutput = (char *)calloc(count, sizeof(char));
+            vps->textOutputLen = count;
+            vps->textOutput = (char *)calloc(count, sizeof(char));
             break;
         default:
-            vps->valueOutput = (char *)calloc(64, sizeof(char));
+            vps->textOutput = (char *)calloc(64, sizeof(char));
             break;
         }
     }
@@ -2275,20 +2296,20 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
     switch (value->type)
     {
     case VT_CHAR:
-        vps->valueOutput[0] = value->value.Char;
+        vps->textOutput[0] = value->value.Char;
         break;
     case VT_STRING:
         return value->value.String;
     case VT_INT:
-        sprintf(vps->valueOutput, "%d", value->value.Int);
+        sprintf(vps->textOutput, "%d", value->value.Int);
         break;
     case VT_DOUBLE:
         if (value->param[1])
             strDemoDouble[2] = (value->param[1] % 10) + '0'; //指定保留小数位数
-        sprintf(vps->valueOutput, strDemoDouble, value->value.Double);
+        sprintf(vps->textOutput, strDemoDouble, value->value.Double);
         break;
     case VT_BOOL:
-        sprintf(vps->valueOutput, "%s", value->value.Bool ? "true" : "false");
+        sprintf(vps->textOutput, "%s", value->value.Bool ? "true" : "false");
         break;
     case VT_INT_ARRAY:
         if (value->param[0] && value->param[0] != '%')
@@ -2297,11 +2318,11 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             strDemoIntArray[2] = (value->param[1] % 10) + '0'; //指定高位补0数量
         for (i = 0, count = 0; i < value->vSize / sizeof(int); i += 1)
         {
-            ret = sprintf(&vps->valueOutput[count], strDemoIntArray, value->value.IntArray[i]);
+            ret = sprintf(&vps->textOutput[count], strDemoIntArray, value->value.IntArray[i]);
             count += ret;
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
-        vps->valueOutput[count - 1] =
+        vps->textOutput[count - 1] =
             (i == 1 && value->param[0]) ? value->param[0] : 0;
         break;
     case VT_DOUBLE_ARRAY:
@@ -2311,11 +2332,11 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             strDemoDoubleArray[2] = (value->param[1] % 10) + '0'; //指定保留小数位数
         for (i = 0, count = 0; i < value->vSize / sizeof(double); i += 1)
         {
-            ret = sprintf(&vps->valueOutput[count], strDemoDoubleArray, value->value.DoubleArray[i]);
+            ret = sprintf(&vps->textOutput[count], strDemoDoubleArray, value->value.DoubleArray[i]);
             count += ret;
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
-        vps->valueOutput[count - 1] =
+        vps->textOutput[count - 1] =
             (i == 1 && value->param[0]) ? value->param[0] : 0;
         break;
     case VT_BOOL_ARRAY:
@@ -2323,11 +2344,11 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             strDemoStrArray[2] = value->param[0]; //指定分隔符
         for (i = 0, count = 0; i < value->vSize / sizeof(bool); i += 1)
         {
-            ret = sprintf(&vps->valueOutput[count], strDemoStrArray, value->value.BoolArray[i] ? "true" : "false");
+            ret = sprintf(&vps->textOutput[count], strDemoStrArray, value->value.BoolArray[i] ? "true" : "false");
             count += ret;
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
-        vps->valueOutput[count - 1] =
+        vps->textOutput[count - 1] =
             (i == 1 && value->param[0]) ? value->param[0] : 0;
         break;
     case VT_STRING_ARRAY:
@@ -2335,25 +2356,25 @@ char *_viewTool_valuePrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             strDemoStrArray[2] = value->param[0]; //指定分隔符
         for (i = 0, count = 0; i < value->vSize / sizeof(char *); i += 1)
             count += strlen(value->value.StringArray[i]) + 1;
-        if (count > vps->valueOutputLen)
+        if (count > vps->textOutputLen)
         {
-            free(vps->valueOutput);
-            vps->valueOutput = (char *)calloc(count, sizeof(char));
+            free(vps->textOutput);
+            vps->textOutput = (char *)calloc(count, sizeof(char));
         }
         for (i = 0, count = 0; i < value->vSize / sizeof(char *); i += 1)
         {
-            ret = sprintf(&vps->valueOutput[count], strDemoStrArray, value->value.StringArray[i]);
+            ret = sprintf(&vps->textOutput[count], strDemoStrArray, value->value.StringArray[i]);
             count += ret;
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
-        vps->valueOutput[count - 1] =
+        vps->textOutput[count - 1] =
             (i == 1 && value->param[0]) ? value->param[0] : 0;
         break;
     default:
         return NULL;
     }
 
-    return vps->valueOutput;
+    return vps->textOutput;
 }
 
 //控件锁定(失能)时的颜色处理
@@ -2396,10 +2417,10 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
             xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
     }
     //形状绘制
-    view->shapeAbsXY[0][0] = view->absXY[0][0] + view->shapeLeftEdge;
-    view->shapeAbsXY[1][0] = view->absXY[1][0] - view->shapeRightEdge;
-    view->shapeAbsXY[0][1] = view->absXY[0][1] + view->shapeTopEdge;
-    view->shapeAbsXY[1][1] = view->absXY[1][1] - view->shapeBottomEdge;
+    view->shapeAbsXY[0][0] = view->absXY[0][0] + view->shapeEdgeLeft;
+    view->shapeAbsXY[1][0] = view->absXY[1][0] - view->shapeEdgeRight;
+    view->shapeAbsXY[0][1] = view->absXY[0][1] + view->shapeEdgeTop;
+    view->shapeAbsXY[1][1] = view->absXY[1][1] - view->shapeEdgeBottom;
     widthTemp = view->shapeAbsXY[1][0] - view->shapeAbsXY[0][0] + 1;
     heightTemp = view->shapeAbsXY[1][1] - view->shapeAbsXY[0][1] + 1;
     if (view->shapeColorPrint)
@@ -2841,10 +2862,10 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                 view->picPathBakup = view->picPath = NULL;
         }
         //输出范围计算
-        view->picAbsXY[0][0] = view->absXY[0][0] + view->picLeftEdge;
-        view->picAbsXY[1][0] = view->absXY[1][0] - view->picRightEdge;
-        view->picAbsXY[0][1] = view->absXY[0][1] + view->picTopEdge;
-        view->picAbsXY[1][1] = view->absXY[1][1] - view->picBottomEdge;
+        view->picAbsXY[0][0] = view->absXY[0][0] + view->picEdgeLeft;
+        view->picAbsXY[1][0] = view->absXY[1][0] - view->picEdgeRight;
+        view->picAbsXY[0][1] = view->absXY[0][1] + view->picEdgeTop;
+        view->picAbsXY[1][1] = view->absXY[1][1] - view->picEdgeBottom;
         //拉伸/缩放输出
         if (view->picUseReplaceColor && view->picReplaceColorBy)
             view_rectangle_padding(
@@ -2865,64 +2886,64 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
     }
 
     //内容输出
-    if (view->value && view->valueColor)
+    if (view->text && view->textColor)
     {
         if (view->lock)
-            colorTemp = _viewTool_lockColor(view->valueColor);
+            colorTemp = _viewTool_lockColor(view->textColor);
         else
-            colorTemp = view->valueColor;
-        //指定输出指针 *valueOutput
-        view->valueOutput = _viewTool_valuePrint(view->value, &view->valuePrint);
+            colorTemp = view->textColor;
+        //指定输出指针 *textOutput
+        view->textOutput = _viewTool_textPrint(view->text, &view->textPrint);
         //输出范围计算
-        view->valueAbsXY[0][0] = view->absXY[0][0] + view->valueLeftEdge;
-        view->valueAbsXY[1][0] = view->absXY[1][0] - view->valueRightEdge;
-        view->valueAbsXY[0][1] = view->absXY[0][1] + view->valueTopEdge;
-        view->valueAbsXY[1][1] = view->absXY[1][1] - view->valueBottomEdge;
-        widthTemp = view->valueAbsXY[1][0] - view->valueAbsXY[0][0] + 1;
-        heightTemp = view->valueAbsXY[1][1] - view->valueAbsXY[0][1] + 1;
+        view->textAbsXY[0][0] = view->absXY[0][0] + view->textEdgeLeft;
+        view->textAbsXY[1][0] = view->absXY[1][0] - view->textEdgeRight;
+        view->textAbsXY[0][1] = view->absXY[0][1] + view->textEdgeTop;
+        view->textAbsXY[1][1] = view->absXY[1][1] - view->textEdgeBottom;
+        widthTemp = view->textAbsXY[1][0] - view->textAbsXY[0][0] + 1;
+        heightTemp = view->textAbsXY[1][1] - view->textAbsXY[0][1] + 1;
 
-        if (view->valueOutput)
+        if (view->textOutput)
         {
 #if (MAKE_FREETYPE)
             //----- 输出方式一: 自动换行输出 -----
-            if (view->valueYEdge > 0)
+            if (view->textEdgeY > 0)
             {
                 //计算实际输出时的宽/高
                 ttf_getSizeByUtf8_multiLine(
                     ViewTTF,
-                    view->valueOutput,
-                    view->valueType,
-                    view->valueXEdge, view->valueYEdge,
-                    view->valueAbsXY[1][0] - view->valueAbsXY[0][0],
+                    view->textOutput,
+                    view->textSize,
+                    view->textEdgeX, view->textEdgeY,
+                    view->textAbsXY[1][0] - view->textAbsXY[0][0],
                     &intTemp, &intTemp2);
                 //左右居中处理
-                if (view->valueHorType == 0) //居中
+                if (view->textSideX == VTST_CENTER) //居中
                 {
-                    view->valueAbsXY[0][0] = view->valueAbsXY[0][0] + (widthTemp - intTemp) / 2;
-                    view->valueAbsXY[1][0] = view->valueAbsXY[0][0] + intTemp - 1;
+                    view->textAbsXY[0][0] = view->textAbsXY[0][0] + (widthTemp - intTemp) / 2;
+                    view->textAbsXY[1][0] = view->textAbsXY[0][0] + intTemp - 1;
                 }
-                else if (view->valueHorType == 1) //向左对齐
+                else if (view->textSideX == VTST_LEFT_TOP) //向左对齐
                     ;
                 else //向右对齐
-                    view->valueAbsXY[0][0] = view->valueAbsXY[0][0] + (widthTemp - intTemp);
+                    view->textAbsXY[0][0] = view->textAbsXY[0][0] + (widthTemp - intTemp);
                 //上下居中处理
-                if (view->valueVerType == 0)
+                if (view->textSideY == VTST_CENTER)
                 {
-                    view->valueAbsXY[0][1] = view->valueAbsXY[0][1] + (heightTemp - intTemp2) / 2;
-                    view->valueAbsXY[1][1] = view->valueAbsXY[0][1] + intTemp2 - 1;
+                    view->textAbsXY[0][1] = view->textAbsXY[0][1] + (heightTemp - intTemp2) / 2;
+                    view->textAbsXY[1][1] = view->textAbsXY[0][1] + intTemp2 - 1;
                 }
-                else if (view->valueVerType == 1) //向上对齐
+                else if (view->textSideY == VTST_LEFT_TOP) //向上对齐
                     ;
                 else //向下对齐
-                    view->valueAbsXY[0][1] = view->valueAbsXY[0][1] + (heightTemp - intTemp2);
+                    view->textAbsXY[0][1] = view->textAbsXY[0][1] + (heightTemp - intTemp2);
 
                 view_string_rectangleLineWrap(
                     colorTemp, -1,
-                    view->valueOutput,
-                    view->valueAbsXY[0][0], view->valueAbsXY[0][1],
+                    view->textOutput,
+                    view->textAbsXY[0][0], view->textAbsXY[0][1],
                     intTemp, intTemp2,
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1],
-                    view->valueType, view->valueXEdge, view->valueYEdge,
+                    view->textSize, view->textEdgeX, view->textEdgeY,
                     NULL, NULL);
             }
             else
@@ -2930,46 +2951,47 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                 //计算实际输出时的宽/高
                 intTemp = ttf_getSizeByUtf8(
                     ViewTTF,
-                    view->valueOutput,
-                    view->valueType,
-                    view->valueXEdge,
+                    view->textOutput,
+                    view->textSize,
+                    view->textEdgeX,
                     &intTemp2);
                 //上下居中处理
-                if (view->valueVerType == 0)
+                if (view->textSideY == VTST_CENTER)
                 {
-                    view->valueAbsXY[0][1] = view->valueAbsXY[0][1] + (heightTemp - intTemp2) / 2;
-                    view->valueAbsXY[1][1] = view->valueAbsXY[0][1] + intTemp2 - 1;
+                    view->textAbsXY[0][1] = view->textAbsXY[0][1] + (heightTemp - intTemp2) / 2;
+                    view->textAbsXY[1][1] = view->textAbsXY[0][1] + intTemp2 - 1;
                 }
-                else if (view->valueVerType == 1) //向上对齐
+                else if (view->textSideY == VTST_LEFT_TOP) //向上对齐
                     ;
                 else //向下对齐
-                    view->valueAbsXY[0][1] = view->valueAbsXY[0][1] + (heightTemp - intTemp2);
+                    view->textAbsXY[0][1] = view->textAbsXY[0][1] + (heightTemp - intTemp2);
                 //----- 输出方式二: 滚动输出 -----
                 if (view->scroll > 0 &&
-                    intTemp > view->valueAbsXY[1][0] - view->valueAbsXY[0][0]) //内容超出方框才滚动
+                    intTemp > view->textAbsXY[1][0] - view->textAbsXY[0][0]) //内容超出方框才滚动
                 {
-                    if (view->valueAbsXY[0][0] < xyLimit[0][0])
-                        view->valueAbsXY[0][0] = xyLimit[0][0];
-                    if (view->valueAbsXY[0][1] < xyLimit[0][1])
-                        view->valueAbsXY[0][1] = xyLimit[0][1];
-                    if (view->valueAbsXY[1][0] > xyLimit[1][0])
-                        view->valueAbsXY[1][0] = xyLimit[1][0];
-                    if (view->valueAbsXY[1][1] > xyLimit[1][1])
-                        view->valueAbsXY[1][1] = xyLimit[1][1];
-                    //
+                    if (view->textAbsXY[0][0] < xyLimit[0][0])
+                        view->textAbsXY[0][0] = xyLimit[0][0];
+                    if (view->textAbsXY[0][1] < xyLimit[0][1])
+                        view->textAbsXY[0][1] = xyLimit[0][1];
+                    if (view->textAbsXY[1][0] > xyLimit[1][0])
+                        view->textAbsXY[1][0] = xyLimit[1][0];
+                    if (view->textAbsXY[1][1] > xyLimit[1][1])
+                        view->textAbsXY[1][1] = xyLimit[1][1];
+
                     view->scrollCount = view_string_rectangleCR(
                         colorTemp, -1,
-                        view->valueOutput,
-                        view->valueAbsXY[0][0],
-                        view->valueAbsXY[0][1],
-                        view->valueAbsXY[1][0] - view->valueAbsXY[0][0], intTemp2,
-                        view->valueAbsXY[0][0], view->valueAbsXY[0][1], view->valueAbsXY[1][0], view->valueAbsXY[1][1],
-                        view->valueType, view->valueXEdge,
+                        view->textOutput,
+                        view->textAbsXY[0][0],
+                        view->textAbsXY[0][1],
+                        view->textAbsXY[1][0] - view->textAbsXY[0][0], intTemp2,
+                        view->textAbsXY[0][0], view->textAbsXY[0][1], view->textAbsXY[1][0], view->textAbsXY[1][1],
+                        view->textSize, view->textEdgeX,
                         view->scrollCount);
-                    view->scrollCount2 += 1;
-                    if (view->scrollCount2 >= view->scrollPeriod)
+
+                    view->scrollPeriodCount += 1;
+                    if (view->scrollPeriodCount >= view->scrollPeriod)
                     {
-                        view->scrollCount2 = 0;
+                        view->scrollPeriodCount = 0;
                         view->scrollCount -= view->scroll; //注意偏移量是往负值增加,即字幕往左滚动
                     }
                 }
@@ -2977,23 +2999,23 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
                 else
                 {
                     //左右居中处理(上面滚动是用不着横向居中的)
-                    if (view->valueHorType == 0)
+                    if (view->textSideX == VTST_CENTER)
                     {
-                        view->valueAbsXY[0][0] = view->valueAbsXY[0][0] + (widthTemp - intTemp) / 2;
-                        view->valueAbsXY[1][0] = view->valueAbsXY[0][0] + intTemp - 1;
+                        view->textAbsXY[0][0] = view->textAbsXY[0][0] + (widthTemp - intTemp) / 2;
+                        view->textAbsXY[1][0] = view->textAbsXY[0][0] + intTemp - 1;
                     }
-                    else if (view->valueHorType == 1) //向左对齐
+                    else if (view->textSideX == VTST_LEFT_TOP) //向左对齐
                         ;
                     else //向右对齐
-                        view->valueAbsXY[0][0] = view->valueAbsXY[0][0] + (widthTemp - intTemp);
+                        view->textAbsXY[0][0] = view->textAbsXY[0][0] + (widthTemp - intTemp);
                     view_string_rectangle(
                         colorTemp, -1,
-                        view->valueOutput,
-                        view->valueAbsXY[0][0],
-                        view->valueAbsXY[0][1],
+                        view->textOutput,
+                        view->textAbsXY[0][0],
+                        view->textAbsXY[0][1],
                         intTemp, intTemp2,
                         xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1],
-                        view->valueType, view->valueXEdge);
+                        view->textSize, view->textEdgeX);
                 }
             }
 #endif
@@ -3007,20 +3029,20 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
             ;
         else
         {
-            // if(view->valueAbsXY[0][0] < xyLimit[0][0])
+            // if(view->textAbsXY[0][0] < xyLimit[0][0])
             //     intTemp = xyLimit[0][0];
             // else
-            //     intTemp = view->valueAbsXY[0][0];
+            //     intTemp = view->textAbsXY[0][0];
             // //
-            // if(view->valueAbsXY[1][0] > xyLimit[1][0])
+            // if(view->textAbsXY[1][0] > xyLimit[1][0])
             //     intTemp2 = xyLimit[1][0];
             // else
-            //     intTemp2 = view->valueAbsXY[1][0];
+            //     intTemp2 = view->textAbsXY[1][0];
             // //
             // view_line(
             //     view->bottomLineColor,
-            //     intTemp, view->valueAbsXY[1][1],
-            //     intTemp2, view->valueAbsXY[1][1],
+            //     intTemp, view->textAbsXY[1][1],
+            //     intTemp2, view->textAbsXY[1][1],
             //     view->bottomLine, 0);
             //
             view_line(
@@ -3120,9 +3142,6 @@ void _view_draw(View_Struct *view, int xyLimit[2][2])
             break;
         }
     }
-
-    //mark
-    ;
 
     //自定义绘制方法
     if (view->drawEnd)
@@ -3513,7 +3532,7 @@ typedef struct
     View_Struct *callBackNextView;
     int astrict; //限制输入长度(针对横向列表输入)
 
-    int contentType2, contentMinType;
+    int contentSize2, contentMinSize;
 } _InputBackup_Struct;
 
 int _input_comm_callBack(View_Struct *view, void *object, View_Focus *focus, ViewButtonTouch_Event *event)
@@ -3542,7 +3561,7 @@ int _input_comm_callBack(View_Struct *view, void *object, View_Focus *focus, Vie
             vsStandard = vsParent->view->next;
             vsHead = vsParent->view->next->next;
             vsTail = vsParent->lastView;
-            movMax = -(vsTail->number - vsHead->number) * (ibs->contentMinType + 4);
+            movMax = -(vsTail->number - vsHead->number) * (ibs->contentMinSize + 4);
         }
         else if (ibs->type == 2)
         {
@@ -3550,7 +3569,7 @@ int _input_comm_callBack(View_Struct *view, void *object, View_Focus *focus, Vie
             vsStandard = vsParent->view->next->next;
             vsHead = vsParent->view->next->next->next;
             vsTail = vsParent->lastView->last;
-            movMax = -(vsTail->number - vsHead->number) * (ibs->contentMinType / 2 + 4);
+            movMax = -(vsTail->number - vsHead->number) * (ibs->contentMinSize / 2 + 4);
         }
 
         if (event->type == VBTT_CLICK_UP)
@@ -3573,29 +3592,29 @@ int _input_comm_callBack(View_Struct *view, void *object, View_Focus *focus, Vie
             else if (vsHead->rTopBottomErr < movMax)
                 vsHead->rTopBottomErr = movMax;
             //找到当前居中的 view
-            vsCurr = view_num(vsParent->view, vsHead->number + (int)((-vsHead->rTopBottomErr) / (ibs->contentMinType + 4)));
+            vsCurr = view_num(vsParent->view, vsHead->number + (int)((-vsHead->rTopBottomErr) / (ibs->contentMinSize + 4)));
             //透明度 字体 和 控件高度 调整
-            vsCurr->valueType = vsStandard->valueType;
+            vsCurr->textSize = vsStandard->textSize;
             vsCurr->height = vsStandard->height;
             vsCurr->bottomLine = 2;
             for (alpha = 15, vsTemp = vsCurr->last;
                  vsTemp && vsTemp->number > 2 && alpha < 255;
                  alpha += 60, vsTemp = vsTemp->last)
             {
-                vsTemp->valueColor &= 0xFFFFFF00;
-                vsTemp->valueColor |= alpha;
-                vsTemp->valueType = ibs->contentMinType * 10;
-                vsTemp->height = ibs->contentMinType + 4;
+                vsTemp->textColor &= 0xFFFFFF00;
+                vsTemp->textColor |= alpha;
+                vsTemp->textSize = ibs->contentMinSize * 10;
+                vsTemp->height = ibs->contentMinSize + 4;
                 vsTemp->bottomLine = 0;
             }
             for (alpha = 15, vsTemp = vsCurr->next;
                  vsTemp && alpha < 255;
                  alpha += 60, vsTemp = vsTemp->next)
             {
-                vsTemp->valueColor &= 0xFFFFFF00;
-                vsTemp->valueColor |= alpha;
-                vsTemp->valueType = ibs->contentMinType * 10;
-                vsTemp->height = ibs->contentMinType + 4;
+                vsTemp->textColor &= 0xFFFFFF00;
+                vsTemp->textColor |= alpha;
+                vsTemp->textSize = ibs->contentMinSize * 10;
+                vsTemp->height = ibs->contentMinSize + 4;
                 vsTemp->bottomLine = 0;
             }
         }
@@ -3620,25 +3639,25 @@ int _input_comm_callBack(View_Struct *view, void *object, View_Focus *focus, Vie
             else if (vsHead->rLeftRightErr < movMax)
                 vsHead->rLeftRightErr = movMax;
             //找到当前居中的 view
-            vsCurr = view_num(vsParent->view, vsHead->number + (int)((-vsHead->rLeftRightErr) / (ibs->contentMinType / 2 + 4)));
+            vsCurr = view_num(vsParent->view, vsHead->number + (int)((-vsHead->rLeftRightErr) / (ibs->contentMinSize / 2 + 4)));
             //字体 和 控件宽度 调整
-            vsCurr->valueType = vsStandard->valueType;
+            vsCurr->textSize = vsStandard->textSize;
             vsCurr->width = vsStandard->width;
             vsCurr->bottomLine = 2;
             for (vsTemp = vsCurr->last;
                  vsTemp && vsTemp->number > 3;
                  vsTemp = vsTemp->last)
             {
-                vsTemp->valueType = ibs->contentMinType * 10;
-                vsTemp->width = ibs->contentMinType / 2 + 4;
+                vsTemp->textSize = ibs->contentMinSize * 10;
+                vsTemp->width = ibs->contentMinSize / 2 + 4;
                 vsTemp->bottomLine = 0;
             }
             for (vsTemp = vsCurr->next;
                  vsTemp && vsTemp->number < vsParent->lastView->number;
                  vsTemp = vsTemp->next)
             {
-                vsTemp->valueType = ibs->contentMinType * 10;
-                vsTemp->width = ibs->contentMinType / 2 + 4;
+                vsTemp->textSize = ibs->contentMinSize * 10;
+                vsTemp->width = ibs->contentMinSize / 2 + 4;
                 vsTemp->bottomLine = 0;
             }
         }
@@ -3678,7 +3697,7 @@ int _input_enter_callBack(View_Struct *view, void *object, View_Focus *focus, Vi
             //横向列表
             case 2:
                 //候选列表有删除符
-                if (vsParent->view->next->next->value->value.String[0] == VIEW_DEL_CHAR)
+                if (vsParent->view->next->next->text->value.String[0] == VIEW_DEL_CHAR)
                     vidChar[0] = VIEW_DEL_CHAR;
                 //返回前赋值
                 if (ibs->value)
@@ -3691,7 +3710,7 @@ int _input_enter_callBack(View_Struct *view, void *object, View_Focus *focus, Vi
                     for (i = 0, vsTemp = vsParent->view->next->next->next;
                          vsTemp && vsTemp != vsParent->lastView;
                          i++, vsTemp = vsTemp->next)
-                        backString[i] = vsTemp->value->value.Char;
+                        backString[i] = vsTemp->text->value.Char;
 
                     if (i > 0)
                     {
@@ -3804,11 +3823,11 @@ int _input_list_callBack(View_Struct *view, void *object, View_Focus *focus, Vie
             if (ibs->value)
             {
                 //选中的是个删除符,拷贝删除符到返回缓存 ibs->value
-                if (view->value == &ViewSrc.Api_Del_Char)
+                if (view->text == &ViewSrc.Api_Del_Char)
                     viewValue_reset(ibs->value, NULL, VT_CHAR, 1, VIEW_DEL_CHAR);
                 //拷贝选中数据到返回缓存 ibs->value
                 else
-                    viewValue_copy(ibs->value, view->value);
+                    viewValue_copy(ibs->value, view->text);
             }
             //有输入结束回调
             if (ibs->callBack)
@@ -3858,14 +3877,14 @@ int _input_list2_input_callBack(View_Struct *view, void *object, View_Focus *foc
     if (view)
     {
         vsParent = view->parent;
-        if (vsParent->view->next->next->value->value.String[0] == VIEW_DEL_CHAR)
+        if (vsParent->view->next->next->text->value.String[0] == VIEW_DEL_CHAR)
             vidChar = VIEW_DEL_CHAR;
 
         //使用了删除符号
         if (vidChar)
         {
             //当前输入为列表最后一个,且输入的不是"删除",则在列表后面再加一位
-            if (view == vsParent->lastView->last && view->value->value.Char != vidChar)
+            if (view == vsParent->lastView->last && view->text->value.Char != vidChar)
             {
                 ibs = (_InputBackup_Struct *)(vsParent->privateData);
                 if (ibs->astrict > 0 &&
@@ -3875,13 +3894,13 @@ int _input_list2_input_callBack(View_Struct *view, void *object, View_Focus *foc
                 {
                     vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));
                     sprintf(vsTemp->name, "_input_content%d", view->number + 1);
-                    vsTemp->width = ibs->contentMinType / 2 + 4;
-                    vsTemp->height = ibs->contentType2 + 4;
+                    vsTemp->width = ibs->contentMinSize / 2 + 4;
+                    vsTemp->height = ibs->contentSize2 + 4;
                     vsTemp->rNumber = VRNT_LAST;
                     vsTemp->rType = VRT_RIGHT;
-                    vsTemp->value = viewValue_init(vsTemp->name, VT_CHAR, 1, VIEW_DEL_CHAR);
-                    vsTemp->valueType = ibs->contentMinType * 10;
-                    vsTemp->valueColor = ViewColor.Tips;
+                    vsTemp->text = viewValue_init(vsTemp->name, VT_CHAR, 1, VIEW_DEL_CHAR);
+                    vsTemp->textSize = ibs->contentMinSize * 10;
+                    vsTemp->textColor = ViewColor.Tips;
                     vsTemp->bottomLineColor = focus->color;
                     vsTemp->focusStop = true;
                     vsTemp->callBack = (ViewCallBack)&_input_list2_callBack;
@@ -3890,7 +3909,7 @@ int _input_list2_input_callBack(View_Struct *view, void *object, View_Focus *foc
                 }
             }
             //在任意位置输入了删除符号,移除当前 view 往后的 view
-            else if (view->value->value.Char == vidChar)
+            else if (view->text->value.Char == vidChar)
             {
                 while (vsParent->callBackForbid)
                     view_delayms(5);
@@ -3911,9 +3930,9 @@ int _input_list2_callBack(View_Struct *view, void *object, View_Focus *focus, Vi
         if (event->type == VBTT_CLICK_UP)
         {
             view_input(
-                view->parent->view->value->value.String,
-                view->value,
-                view->parent->view->next->next->value,
+                view->parent->view->text->value.String,
+                view->text,
+                view->parent->view->next->next->text,
                 view,
                 view->parent,
                 focus,
@@ -3930,11 +3949,11 @@ int _input_viewStart(View_Struct *view, void *object, View_Focus *focus, ViewBut
 {
     View_Struct *vsFocus, *vsTemp;
     uint8_t alpha;
-    int valueType;
+    int textSize;
     _InputBackup_Struct *ibs;
 
     ibs = view->privateData;
-    valueType = ibs->contentMinType * 10;
+    textSize = ibs->contentMinSize * 10;
 
     if (focus && !focus->view->backView && focus->view->parent == view)
     {
@@ -3946,27 +3965,27 @@ int _input_viewStart(View_Struct *view, void *object, View_Focus *focus, ViewBut
             if (vsFocus->absXY[0][1] != view->view->next->absXY[0][1])
             {
                 //位置平移
-                view->view->next->next->rTopBottomErr = -(vsFocus->number - view->view->next->next->number) * (ibs->contentMinType + 4);
+                view->view->next->next->rTopBottomErr = -(vsFocus->number - view->view->next->next->number) * (ibs->contentMinSize + 4);
                 //透明度 字体 和 控件高度 调整
-                vsFocus->valueColor |= 0xFF;
-                vsFocus->valueType = view->view->next->valueType;
+                vsFocus->textColor |= 0xFF;
+                vsFocus->textSize = view->view->next->textSize;
                 vsFocus->height = view->view->next->height;
                 // ->last
                 for (alpha = 15, vsTemp = vsFocus->last;
                      vsTemp && vsTemp->number > 2 && alpha < 255;
                      alpha += 60, vsTemp = vsTemp->last)
                 {
-                    vsTemp->valueColor &= 0xFFFFFF00;
-                    vsTemp->valueColor |= alpha;
-                    vsTemp->valueType = valueType;
-                    vsTemp->height = ibs->contentMinType + 4;
+                    vsTemp->textColor &= 0xFFFFFF00;
+                    vsTemp->textColor |= alpha;
+                    vsTemp->textSize = textSize;
+                    vsTemp->height = ibs->contentMinSize + 4;
                     vsTemp->bottomLine = 0;
                 }
                 for (; vsTemp && vsTemp->number > 2; vsTemp = vsTemp->last)
                 {
-                    vsTemp->valueColor |= 0xFF;
-                    vsTemp->valueType = valueType;
-                    vsTemp->height = ibs->contentMinType + 4;
+                    vsTemp->textColor |= 0xFF;
+                    vsTemp->textSize = textSize;
+                    vsTemp->height = ibs->contentMinSize + 4;
                     vsTemp->bottomLine = 0;
                 }
                 // ->next
@@ -3974,17 +3993,17 @@ int _input_viewStart(View_Struct *view, void *object, View_Focus *focus, ViewBut
                      vsTemp && alpha < 255;
                      alpha += 60, vsTemp = vsTemp->next)
                 {
-                    vsTemp->valueColor &= 0xFFFFFF00;
-                    vsTemp->valueColor |= alpha;
-                    vsTemp->valueType = valueType;
-                    vsTemp->height = ibs->contentMinType + 4;
+                    vsTemp->textColor &= 0xFFFFFF00;
+                    vsTemp->textColor |= alpha;
+                    vsTemp->textSize = textSize;
+                    vsTemp->height = ibs->contentMinSize + 4;
                     vsTemp->bottomLine = 0;
                 }
                 for (; vsTemp; vsTemp = vsTemp->next)
                 {
-                    vsTemp->valueColor |= 0xFF;
-                    vsTemp->valueType = valueType;
-                    vsTemp->height = ibs->contentMinType + 4;
+                    vsTemp->textColor |= 0xFF;
+                    vsTemp->textSize = textSize;
+                    vsTemp->height = ibs->contentMinSize + 4;
                     vsTemp->bottomLine = 0;
                 }
             }
@@ -3996,24 +4015,24 @@ int _input_viewStart(View_Struct *view, void *object, View_Focus *focus, ViewBut
                 vsFocus->absXY[0][0] != view->view->next->next->absXY[0][0])
             {
                 //位置平移
-                view->view->next->next->next->rLeftRightErr = -(vsFocus->number - view->view->next->next->next->number) * (ibs->contentMinType / 2 + 4);
+                view->view->next->next->next->rLeftRightErr = -(vsFocus->number - view->view->next->next->next->number) * (ibs->contentMinSize / 2 + 4);
                 //字体 和 控件宽度 调整
-                vsFocus->valueType = view->view->next->next->valueType;
+                vsFocus->textSize = view->view->next->next->textSize;
                 vsFocus->width = view->view->next->next->width;
                 for (vsTemp = vsFocus->last;
                      vsTemp && vsTemp->number > 3;
                      vsTemp = vsTemp->last)
                 {
-                    vsTemp->valueType = ibs->contentMinType * 10;
-                    vsTemp->width = ibs->contentMinType / 2 + 4;
+                    vsTemp->textSize = ibs->contentMinSize * 10;
+                    vsTemp->width = ibs->contentMinSize / 2 + 4;
                     vsTemp->bottomLine = 0;
                 }
                 for (vsTemp = vsFocus->next;
                      vsTemp && vsTemp->number < view->lastView->number;
                      vsTemp = vsTemp->next)
                 {
-                    vsTemp->valueType = ibs->contentMinType * 10;
-                    vsTemp->width = ibs->contentMinType / 2 + 4;
+                    vsTemp->textSize = ibs->contentMinSize * 10;
+                    vsTemp->width = ibs->contentMinSize / 2 + 4;
                     vsTemp->bottomLine = 0;
                 }
             }
@@ -4056,9 +4075,12 @@ void view_input(
     View_Struct *vsTemp, *retView = NULL;
     _InputBackup_Struct *ibs;
 
-    int labelType = ViewSrc.Common_LabelType.value.Int;
-    int contentType = ViewSrc.Common_ContentType.value.Int, contentType2 = 48, contentMinType = 32, lineSize = 2;
-    int rad = ViewSrc.Common_Rad.value.Int;
+    int labelSize = ViewSrc.Label_Size.value.Int;
+    int contentSize = ViewSrc.Content_Type.value.Int;
+    int contentSize2 = 4;
+    int contentMinSize = 32;
+    int lineSize = 2;
+    int rad = ViewSrc.Shape_Rad.value.Int;
 
     int count;
     bool retBool = false;
@@ -4084,8 +4106,8 @@ void view_input(
     ibs->callBackNext = callBackNext;
     ibs->callBackNextView = callBackNextView;
     ibs->astrict = astrict;
-    ibs->contentType2 = contentType2;
-    ibs->contentMinType = contentMinType;
+    ibs->contentSize2 = contentSize2;
+    ibs->contentMinSize = contentMinSize;
     vs->width = VWHT_MATCH;
     vs->height = VWHT_MATCH;
     sprintf(vs->name, "_input_%d", backView->drawSync);
@@ -4115,50 +4137,50 @@ void view_input(
         vsTemp->shape.rect.rad = rad;
         vsTemp->shape.rect.lineSize = lineSize;
         vsTemp->shapeColorPrint = ViewColor.Button;
-        vsTemp->shapeBottomEdge = 1;
-        vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
-        vsTemp->value = viewValue_init("_input_frameContent", VT_STRING, 1, label);
-        vsTemp->valueType = contentType * 10;
-        vsTemp->valueColor = ViewColor.Tips;
-        vsTemp->valueTopEdge = vsTemp->valueBottomEdge = 5;
-        vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 5; //四周保持5的间距
-        vsTemp->valueYEdge = 6;                             //自动换行,行间距5
+        vsTemp->shapeEdgeBottom = 1;
+        vsTemp->shapeEdgeLeft = vsTemp->shapeEdgeRight = 1;
+        vsTemp->text = viewValue_init("_input_frameContent", VT_STRING, 1, label);
+        vsTemp->textSize = contentSize * 10;
+        vsTemp->textColor = ViewColor.Tips;
+        vsTemp->textEdgeTop = vsTemp->textEdgeBottom = 5;
+        vsTemp->textEdgeLeft = vsTemp->textEdgeRight = 5; //四周保持5的间距
+        vsTemp->textEdgeY = 6;                             //自动换行,行间距5
 
 #if (MAKE_FREETYPE)
         ttf_getSizeByUtf8_multiLine(
             ViewTTF,
             label,
-            vsTemp->valueType,
-            0, vsTemp->valueYEdge,
-            vsParent->absWidth - vsTemp->valueLeftEdge - vsTemp->valueRightEdge,
+            vsTemp->textSize,
+            0, vsTemp->textEdgeY,
+            vsParent->absWidth - vsTemp->textEdgeLeft - vsTemp->textEdgeRight,
             NULL, &retInt);
 
-        if (retInt > (vsParent->absHeight) * 3 / 4 - vsTemp->valueTopEdge - vsTemp->valueBottomEdge) //提示信息太长超出范围
+        if (retInt > (vsParent->absHeight) * 3 / 4 - vsTemp->textEdgeTop - vsTemp->textEdgeBottom) //提示信息太长超出范围
         {
-            vsTemp->valueTopEdge = vsTemp->valueBottomEdge = 3;
-            vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 3; //四周保持5的间距
-            vsTemp->valueYEdge = 4;
-            vsTemp->valueType = 200;
+            vsTemp->textEdgeTop = vsTemp->textEdgeBottom = 3;
+            vsTemp->textEdgeLeft = vsTemp->textEdgeRight = 3; //四周保持5的间距
+            vsTemp->textEdgeY = 4;
+            vsTemp->textSize = 200;
 
             ttf_getSizeByUtf8_multiLine(
                 ViewTTF,
                 label,
-                vsTemp->valueType,
-                0, vsTemp->valueYEdge,
-                vsParent->absWidth - vsTemp->valueLeftEdge - vsTemp->valueRightEdge,
+                vsTemp->textSize,
+                0, vsTemp->textEdgeY,
+                vsParent->absWidth - vsTemp->textEdgeLeft - vsTemp->textEdgeRight,
                 NULL, &retInt);
 
-            if (retInt > (vsParent->absHeight) * 3 / 4 - vsTemp->valueTopEdge - vsTemp->valueBottomEdge) //提示信息还是太长超出范围
+            if (retInt > (vsParent->absHeight) * 3 / 4 - vsTemp->textEdgeTop - vsTemp->textEdgeBottom) //提示信息还是太长超出范围
             {
-                vsTemp->valueYEdge = 2;
-                vsTemp->valueType = 160;
+                vsTemp->textEdgeY = 2;
+                vsTemp->textSize = 160;
             }
         }
 #else
-        vsTemp->valueTopEdge = vsTemp->valueBottomEdge = 3;
-        vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 3; //四周保持5的间距
-        vsTemp->valueYEdge = 4;
-        vsTemp->valueType = 200;
+        vsTemp->textEdgeTop = vsTemp->textEdgeBottom = 3;
+        vsTemp->textEdgeLeft = vsTemp->textEdgeRight = 3; //四周保持5的间距
+        vsTemp->textEdgeY = 4;
+        vsTemp->textSize = 200;
 #endif
 
         vsTemp->callBack = (ViewCallBack)&_input_comm_callBack;
@@ -4175,11 +4197,11 @@ void view_input(
         vsTemp->shape.rect.rad = rad;
         // vsTemp->shape.rect.lineSize = lineSize;
         vsTemp->shapeColorPrint = ViewColor.Gray;
-        vsTemp->shapeTopEdge = vsTemp->shapeBottomEdge = 1;
-        vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
-        vsTemp->value = &ViewSrc.Api_Button_Cancel;
-        vsTemp->valueType = contentType * 10;
-        vsTemp->valueColor = ViewColor.ButtonValue;
+        vsTemp->shapeEdgeTop = vsTemp->shapeEdgeBottom = 1;
+        vsTemp->shapeEdgeLeft = vsTemp->shapeEdgeRight = 1;
+        vsTemp->text = &ViewSrc.Api_Button_Cancel;
+        vsTemp->textSize = contentSize * 10;
+        vsTemp->textColor = ViewColor.ButtonValue;
         vsTemp->focusStop = true;
         vsTemp->callBack = (ViewCallBack)&_input_returnOrCancel_callBack;
         vsTemp->enMoveEvent = true;
@@ -4196,11 +4218,11 @@ void view_input(
         vsTemp->shape.rect.rad = rad;
         // vsTemp->shape.rect.lineSize = lineSize;
         vsTemp->shapeColorPrint = ViewColor.Green;
-        vsTemp->shapeTopEdge = vsTemp->shapeBottomEdge = 1;
-        vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
-        vsTemp->value = &ViewSrc.Api_Button_Enter;
-        vsTemp->valueType = contentType * 10;
-        vsTemp->valueColor = ViewColor.ButtonValue;
+        vsTemp->shapeEdgeTop = vsTemp->shapeEdgeBottom = 1;
+        vsTemp->shapeEdgeLeft = vsTemp->shapeEdgeRight = 1;
+        vsTemp->text = &ViewSrc.Api_Button_Enter;
+        vsTemp->textSize = contentSize * 10;
+        vsTemp->textColor = ViewColor.ButtonValue;
         vsTemp->focusStop = true;
         vsTemp->callBack = (ViewCallBack)&_input_enter_callBack;
         vsTemp->enMoveEvent = true;
@@ -4224,15 +4246,15 @@ void view_input(
         vsTemp->shape.rect.rad = rad;
         vsTemp->shape.rect.lineSize = lineSize;
         vsTemp->shapeColorPrint = ViewColor.Button;
-        vsTemp->shapeBottomEdge = 1;
-        vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
-        vsTemp->value = viewValue_init("multiInput_label", VT_STRING, 1, label);
-        vsTemp->valueType = labelType * 10;
-        vsTemp->valueColor = ViewColor.Label;
-        vsTemp->valueTopEdge = lineSize * 2;
-        vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 5; //左右保持5的间距
-        vsTemp->valueVerType = 1;
-        vsTemp->scroll = labelType / 4; //自动滚动
+        vsTemp->shapeEdgeBottom = 1;
+        vsTemp->shapeEdgeLeft = vsTemp->shapeEdgeRight = 1;
+        vsTemp->text = viewValue_init("multiInput_label", VT_STRING, 1, label);
+        vsTemp->textSize = labelSize * 10;
+        vsTemp->textColor = ViewColor.Label;
+        vsTemp->textEdgeTop = lineSize * 2;
+        vsTemp->textEdgeLeft = vsTemp->textEdgeRight = 5; //左右保持5的间距
+        vsTemp->textSideY = VTST_LEFT_TOP;
+        vsTemp->scroll = labelSize / 4; //自动滚动
         vsTemp->callBack = (ViewCallBack)&_input_comm_callBack;
         vsTemp->enMoveEvent = true;
         view_add(vs, vsTemp, false);
@@ -4263,7 +4285,7 @@ void view_input(
                             viewValue_init("_input_char", VT_CHAR, 1, candidate->value.String[count]);
                 }
 
-                ibs->contentType2 = 56;
+                ibs->contentSize2 = 56;
             }
             break;
         case VT_INT_ARRAY:
@@ -4280,7 +4302,7 @@ void view_input(
                             viewValue_init("_input_int", VT_INT, 1, candidate->value.IntArray[count]);
                 }
 
-                ibs->contentType2 = 56;
+                ibs->contentSize2 = 56;
             }
             break;
         case VT_DOUBLE_ARRAY:
@@ -4297,7 +4319,7 @@ void view_input(
                             viewValue_init("_input_double", VT_DOUBLE, 1, candidate->value.DoubleArray[count]);
                 }
 
-                ibs->contentType2 = 56;
+                ibs->contentSize2 = 56;
             }
             break;
         case VT_STRING_ARRAY:
@@ -4326,9 +4348,9 @@ void view_input(
                 if (pointTemp)
                 {
                     //获取尽可能大的字体
-                    ibs->contentType2 = view_getType(pointTemp, vsParent->absWidth, 0) / 10;
-                    if (ibs->contentMinType > ibs->contentType2)
-                        ibs->contentMinType = ibs->contentType2;
+                    ibs->contentSize2 = view_getType(pointTemp, vsParent->absWidth, 0) / 10;
+                    if (ibs->contentMinSize > ibs->contentSize2)
+                        ibs->contentMinSize = ibs->contentSize2;
                 }
             }
             break;
@@ -4340,10 +4362,10 @@ void view_input(
         vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));
         strcpy(vsTemp->name, "_input_contentMain");
         vsTemp->width = VWHT_MATCH;
-        vsTemp->height = ibs->contentType2 + 4;
+        vsTemp->height = ibs->contentSize2 + 4;
         vsTemp->centerX = true;
         vsTemp->centerY = true;
-        vsTemp->valueType = ibs->contentType2 * 10;
+        vsTemp->textSize = ibs->contentSize2 * 10;
         view_add(vs, vsTemp, false);
 
         //当前值不在候选列表中 把当前值展示在列表最上面
@@ -4352,14 +4374,14 @@ void view_input(
             vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));
             sprintf(vsTemp->name, "_input_content%d", retInt);
             vsTemp->width = VWHT_MATCH;
-            vsTemp->height = ibs->contentType2 + 4;
+            vsTemp->height = ibs->contentSize2 + 4;
             vsTemp->rNumber = VRNT_LAST; //和标杆位置重合
             vsTemp->shapeType = VST_RECT;
             // vsTemp->shape.rect.rad = rad;
-            vsTemp->value = viewValue_copy(NULL, value);
-            vsTemp->valueType = ibs->contentType2 * 10;
-            vsTemp->valueColor = ViewColor.Tips;
-            // vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 5;//左右保持5的间距
+            vsTemp->text = viewValue_copy(NULL, value);
+            vsTemp->textSize = ibs->contentSize2 * 10;
+            vsTemp->textColor = ViewColor.Tips;
+            // vsTemp->textEdgeLeft = vsTemp->textEdgeRight = 5;//左右保持5的间距
             vsTemp->scroll = 4; //自动滚动
             vsTemp->bottomLineColor = focus->color;
             vsTemp->callBack = (ViewCallBack)&_input_list_callBack;
@@ -4383,7 +4405,7 @@ void view_input(
                 if (count == 0 && retBool)
                 {
                     vsTemp->rType = 0;
-                    vsTemp->rTopBottomErr = (count - retInt) * (ibs->contentMinType + 4);
+                    vsTemp->rTopBottomErr = (count - retInt) * (ibs->contentMinSize + 4);
                 }
                 else
                 {
@@ -4393,29 +4415,29 @@ void view_input(
                 //是否是当前
                 if (count == retInt)
                 {
-                    vsTemp->valueType = ibs->contentType2 * 10;
-                    vsTemp->height = ibs->contentType2 + 4;
+                    vsTemp->textSize = ibs->contentSize2 * 10;
+                    vsTemp->height = ibs->contentSize2 + 4;
 
                     retView = vsTemp;
                 }
                 else
                 {
-                    vsTemp->height = ibs->contentMinType + 4;
-                    vsTemp->valueType = ibs->contentMinType * 10;
+                    vsTemp->height = ibs->contentMinSize + 4;
+                    vsTemp->textSize = ibs->contentMinSize * 10;
                 }
                 //透明度
-                vsTemp->valueColor &= 0xFFFFFF00;
+                vsTemp->textColor &= 0xFFFFFF00;
                 if (count > retInt)
-                    vsTemp->valueColor |= (count - retInt > 4) ? 0xFF : ((count - retInt) * 60 + 15);
+                    vsTemp->textColor |= (count - retInt > 4) ? 0xFF : ((count - retInt) * 60 + 15);
                 else if (count < retInt)
-                    vsTemp->valueColor |= (retInt - count > 4) ? 0xFF : ((retInt - count) * 60 + 15);
+                    vsTemp->textColor |= (retInt - count > 4) ? 0xFF : ((retInt - count) * 60 + 15);
                 // vsTemp->shapeType = VST_RECT;
                 // vsTemp->shape.rect.rad = rad;
-                vsTemp->value = vvfArray[count];
-                vsTemp->value->param[0] = value->param[0];
-                vsTemp->value->param[1] = value->param[1];
-                vsTemp->valueColor = ViewColor.Tips;
-                // vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 5;//左右保持5的间距
+                vsTemp->text = vvfArray[count];
+                vsTemp->text->param[0] = value->param[0];
+                vsTemp->text->param[1] = value->param[1];
+                vsTemp->textColor = ViewColor.Tips;
+                // vsTemp->textEdgeLeft = vsTemp->textEdgeRight = 5;//左右保持5的间距
                 vsTemp->scroll = 4; //自动滚动
                 vsTemp->bottomLineColor = focus->color;
                 vsTemp->callBack = (ViewCallBack)&_input_list_callBack;
@@ -4437,7 +4459,7 @@ void view_input(
               value->type == VT_STRING))
     {
         ibs->type = 2;
-        ibs->contentType2 = 64;
+        ibs->contentSize2 = 64;
 
         //框 和 label
         vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));
@@ -4448,14 +4470,14 @@ void view_input(
         vsTemp->shape.rect.rad = rad;
         vsTemp->shape.rect.lineSize = lineSize;
         vsTemp->shapeColorPrint = ViewColor.Button;
-        vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
-        vsTemp->value = viewValue_init("multiInput_label", VT_STRING, 1, label);
-        vsTemp->valueType = labelType * 10;
-        vsTemp->valueColor = ViewColor.Label;
-        vsTemp->valueTopEdge = lineSize * 2;
-        vsTemp->valueLeftEdge = vsTemp->valueRightEdge = 5; //左右保持5的间距
-        vsTemp->valueVerType = 1;
-        vsTemp->scroll = labelType / 4; //自动滚动
+        vsTemp->shapeEdgeLeft = vsTemp->shapeEdgeRight = 1;
+        vsTemp->text = viewValue_init("multiInput_label", VT_STRING, 1, label);
+        vsTemp->textSize = labelSize * 10;
+        vsTemp->textColor = ViewColor.Label;
+        vsTemp->textEdgeTop = lineSize * 2;
+        vsTemp->textEdgeLeft = vsTemp->textEdgeRight = 5; //左右保持5的间距
+        vsTemp->textSideY = VTST_LEFT_TOP;
+        vsTemp->scroll = labelSize / 4; //自动滚动
         vsTemp->callBack = (ViewCallBack)&_input_comm_callBack;
         vsTemp->enMoveEvent = true;
         view_add(vs, vsTemp, false);
@@ -4470,11 +4492,11 @@ void view_input(
         vsTemp->shape.rect.rad = rad;
         // vsTemp->shape.rect.lineSize = lineSize;
         vsTemp->shapeColorPrint = ViewColor.Gray;
-        vsTemp->shapeTopEdge = vsTemp->shapeBottomEdge = 1;
-        vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
-        vsTemp->value = &ViewSrc.Api_Button_Cancel;
-        vsTemp->valueType = contentType * 10;
-        vsTemp->valueColor = ViewColor.ButtonValue;
+        vsTemp->shapeEdgeTop = vsTemp->shapeEdgeBottom = 1;
+        vsTemp->shapeEdgeLeft = vsTemp->shapeEdgeRight = 1;
+        vsTemp->text = &ViewSrc.Api_Button_Cancel;
+        vsTemp->textSize = contentSize * 10;
+        vsTemp->textColor = ViewColor.ButtonValue;
         vsTemp->focusStop = true;
         vsTemp->callBack = (ViewCallBack)&_input_returnOrCancel_callBack;
         vsTemp->enMoveEvent = true;
@@ -4484,13 +4506,13 @@ void view_input(
         //居中位置标杆
         vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));
         strcpy(vsTemp->name, "_input_contentMain");
-        vsTemp->width = ibs->contentType2 / 2 + 4;
-        vsTemp->height = ibs->contentType2 + 4;
+        vsTemp->width = ibs->contentSize2 / 2 + 4;
+        vsTemp->height = ibs->contentSize2 + 4;
         vsTemp->centerX = true;
         // vsTemp->centerY = true;
-        vsTemp->rTopBottomErr = (156 - ibs->contentType2 + 4) / 2;
-        vsTemp->value = viewValue_copy(NULL, candidate);
-        vsTemp->valueType = ibs->contentType2 * 10;
+        vsTemp->rTopBottomErr = (156 - ibs->contentSize2 + 4) / 2;
+        vsTemp->text = viewValue_copy(NULL, candidate);
+        vsTemp->textSize = ibs->contentSize2 * 10;
         vsTemp->bottomLine = 2;
         vsTemp->bottomLineColor = focus->color;
         view_add(vs, vsTemp, false);
@@ -4521,12 +4543,12 @@ void view_input(
             //第一个居中
             vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));
             strcpy(vsTemp->name, "_input_content0");
-            vsTemp->width = ibs->contentType2 / 2 + 4;
-            vsTemp->height = ibs->contentType2 + 4;
+            vsTemp->width = ibs->contentSize2 / 2 + 4;
+            vsTemp->height = ibs->contentSize2 + 4;
             vsTemp->rNumber = VRNT_LAST;
-            vsTemp->value = viewValue_init("_input_content0", VT_CHAR, 1, valueStringPoint[0]);
-            vsTemp->valueType = ibs->contentType2 * 10;
-            vsTemp->valueColor = ViewColor.Tips;
+            vsTemp->text = viewValue_init("_input_content0", VT_CHAR, 1, valueStringPoint[0]);
+            vsTemp->textSize = ibs->contentSize2 * 10;
+            vsTemp->textColor = ViewColor.Tips;
             vsTemp->bottomLineColor = focus->color;
             vsTemp->focusStop = true;
             vsTemp->callBack = (ViewCallBack)&_input_list2_callBack;
@@ -4538,13 +4560,13 @@ void view_input(
             {
                 vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));
                 sprintf(vsTemp->name, "_input_content%d", count);
-                vsTemp->width = ibs->contentMinType / 2 + 4;
-                vsTemp->height = ibs->contentType2 + 4;
+                vsTemp->width = ibs->contentMinSize / 2 + 4;
+                vsTemp->height = ibs->contentSize2 + 4;
                 vsTemp->rNumber = VRNT_LAST;
                 vsTemp->rType = VRT_RIGHT;
-                vsTemp->value = viewValue_init(vsTemp->name, VT_CHAR, 1, valueStringPoint[count]);
-                vsTemp->valueType = ibs->contentMinType * 10;
-                vsTemp->valueColor = ViewColor.Tips;
+                vsTemp->text = viewValue_init(vsTemp->name, VT_CHAR, 1, valueStringPoint[count]);
+                vsTemp->textSize = ibs->contentMinSize * 10;
+                vsTemp->textColor = ViewColor.Tips;
                 vsTemp->bottomLineColor = focus->color;
                 vsTemp->focusStop = true;
                 vsTemp->callBack = (ViewCallBack)&_input_list2_callBack;
@@ -4559,13 +4581,13 @@ void view_input(
                 //留个空位
                 vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));
                 sprintf(vsTemp->name, "_input_content%d", count);
-                vsTemp->width = ibs->contentMinType / 2 + 4;
-                vsTemp->height = ibs->contentType2 + 4;
+                vsTemp->width = ibs->contentMinSize / 2 + 4;
+                vsTemp->height = ibs->contentSize2 + 4;
                 vsTemp->rNumber = VRNT_LAST;
                 vsTemp->rType = VRT_RIGHT;
-                vsTemp->value = viewValue_init(vsTemp->name, VT_CHAR, 1, VIEW_DEL_CHAR);
-                vsTemp->valueType = ibs->contentMinType * 10;
-                vsTemp->valueColor = ViewColor.Tips;
+                vsTemp->text = viewValue_init(vsTemp->name, VT_CHAR, 1, VIEW_DEL_CHAR);
+                vsTemp->textSize = ibs->contentMinSize * 10;
+                vsTemp->textColor = ViewColor.Tips;
                 vsTemp->bottomLineColor = focus->color;
                 vsTemp->focusStop = true;
                 vsTemp->callBack = (ViewCallBack)&_input_list2_callBack;
@@ -4579,12 +4601,12 @@ void view_input(
             //留个空位
             vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));
             sprintf(vsTemp->name, "_input_content%d", 0);
-            vsTemp->width = ibs->contentType2 / 2 + 4;
-            vsTemp->height = ibs->contentType2 + 4;
+            vsTemp->width = ibs->contentSize2 / 2 + 4;
+            vsTemp->height = ibs->contentSize2 + 4;
             vsTemp->rNumber = VRNT_LAST;
-            vsTemp->value = viewValue_init(vsTemp->name, VT_CHAR, 1, candidate->value.String[0]);
-            vsTemp->valueType = ibs->contentType2 * 10;
-            vsTemp->valueColor = ViewColor.Tips;
+            vsTemp->text = viewValue_init(vsTemp->name, VT_CHAR, 1, candidate->value.String[0]);
+            vsTemp->textSize = ibs->contentSize2 * 10;
+            vsTemp->textColor = ViewColor.Tips;
             vsTemp->bottomLineColor = focus->color;
             vsTemp->focusStop = true;
             vsTemp->callBack = (ViewCallBack)&_input_list2_callBack;
@@ -4603,11 +4625,11 @@ void view_input(
         vsTemp->shape.rect.rad = rad;
         // vsTemp->shape.rect.lineSize = lineSize;
         vsTemp->shapeColorPrint = ViewColor.Green;
-        vsTemp->shapeTopEdge = vsTemp->shapeBottomEdge = 1;
-        vsTemp->shapeLeftEdge = vsTemp->shapeRightEdge = 1;
-        vsTemp->value = &ViewSrc.Api_Button_Enter;
-        vsTemp->valueType = contentType * 10;
-        vsTemp->valueColor = ViewColor.ButtonValue;
+        vsTemp->shapeEdgeTop = vsTemp->shapeEdgeBottom = 1;
+        vsTemp->shapeEdgeLeft = vsTemp->shapeEdgeRight = 1;
+        vsTemp->text = &ViewSrc.Api_Button_Enter;
+        vsTemp->textSize = contentSize * 10;
+        vsTemp->textColor = ViewColor.ButtonValue;
         vsTemp->focusStop = true;
         vsTemp->callBack = (ViewCallBack)&_input_enter_callBack;
         vsTemp->enMoveEvent = true;

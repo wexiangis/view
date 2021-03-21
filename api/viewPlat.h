@@ -10,7 +10,7 @@
 #endif
 
 // ===== T31平台对接 =====
-#if(MAKE_PLATFORM == PLATFORM_T31)
+#if (MAKE_PLATFORM == PLATFORM_T31)
 
 #include "t31_plat.h"
 
@@ -18,8 +18,8 @@
 #define VIEW_Y_SIZE T31_Y_SIZE
 #define VIEW_PB T31_PB
 
-#define VIEW_MAP_INIT() t31_map_init()
-#define VIEW_MAP_EN() t31_map_en()
+#define VIEW_MAP_INIT() t31_map_init() //获取屏幕缓存指针
+#define VIEW_MAP_EN() t31_map_en()     //使能输出
 
 // ===== 通用fb平台对接 =====
 #else
@@ -30,8 +30,8 @@
 #define VIEW_Y_SIZE FB_Y_SIZE
 #define VIEW_PB FB_PB
 
-#define VIEW_MAP_INIT() fb_map_init()
-#define VIEW_MAP_EN() fb_map_en()
+#define VIEW_MAP_INIT() fb_map_init() //获取屏幕缓存指针
+#define VIEW_MAP_EN() fb_map_en()     //使能输出
 
 #endif
 
