@@ -19,11 +19,9 @@ ViewValue_Format *viewValue_init(char *name, ViewValue_Type type, int valueNum, 
     char *charP;
 
     if (name == NULL)
-    {
-        fprintf(stderr, "viewValue_init: err, name = NULL !!\r\n");
-        return NULL;
-    }
-    else if (!(type > VT_NULL && type < VT_END))
+        name = "none";
+
+    if (!(type > VT_NULL && type < VT_END))
     {
         fprintf(stderr, "viewValue_init: %s err, unknow type !!\r\n", name);
         return NULL;
@@ -119,9 +117,9 @@ ViewValue_Format *viewValue_init(char *name, ViewValue_Type type, int valueNum, 
         break;
     }
     va_end(ap);
-    //
+
     // pthread_mutex_init(&vvf->lock, NULL);
-    //
+
     return vvf;
 }
 
@@ -129,10 +127,10 @@ ViewValue_Format *viewValue_init(char *name, ViewValue_Type type, int valueNum, 
 void _viewValue_value_release(ViewValue_Format *vvf)
 {
     int i;
-    //
+
     if (vvf == NULL)
         return;
-    //
+
     switch (vvf->type)
     {
     case VT_CHAR:
@@ -208,13 +206,11 @@ void viewValue_release(ViewValue_Format *vvf)
 {
     if (vvf == NULL)
         return;
-    //
+
     memset(vvf->name, 0, sizeof(vvf->name));
-    //
     _viewValue_value_release(vvf);
-    //
     viewValue_release(vvf->next);
-    //
+
     // pthread_mutex_destroy(&vvf->lock);
 }
 
@@ -224,18 +220,18 @@ ViewValue_Format *viewValue_reset(ViewValue_Format *vvf, char *name, ViewValue_T
     va_list ap;
     int i, j;
     char *charP;
-    //
+
     if (vvf == NULL)
         return vvf;
-    //
+
     _viewValue_value_release(vvf);
-    //
+
     if (name)
     {
         memset(vvf->name, 0, sizeof(vvf->name));
         strcpy(vvf->name, name);
     }
-    //
+
     vvf->type = type;
     va_start(ap, valueNum);
     switch (type)
@@ -316,7 +312,7 @@ ViewValue_Format *viewValue_reset(ViewValue_Format *vvf, char *name, ViewValue_T
         break;
     }
     va_end(ap);
-    //
+
     return vvf;
 }
 
@@ -340,13 +336,13 @@ bool _viewValue_compare(char *str1, char *str2)
 bool viewValue_compare(ViewValue_Format *vvf, ViewValue_Format *vvfArray, int *retNum)
 {
     int i;
-    //
+
     if (vvf == NULL || vvfArray == NULL)
         return false;
-    //
+
     if (retNum)
         *retNum = 0;
-    //
+
     switch (vvf->type)
     {
     case VT_CHAR:
@@ -459,7 +455,7 @@ bool viewValue_compare(ViewValue_Format *vvf, ViewValue_Format *vvfArray, int *r
     default:
         break;
     }
-    //
+
     return false;
 }
 
@@ -469,10 +465,10 @@ int viewValue_find(ViewValue_Format *vvfArray, ...)
     int i;
     int ret = -1;
     void *vp;
-    //
+
     if (vvfArray == NULL)
         return ret;
-    //
+
     va_start(ap, vvfArray);
     switch (vvfArray->type)
     {
@@ -561,7 +557,7 @@ int viewValue_find(ViewValue_Format *vvfArray, ...)
         break;
     }
     va_end(ap);
-    //
+
     return ret;
 }
 
@@ -570,10 +566,10 @@ ViewValue_Format *viewValue_copy(ViewValue_Format *vvf1, ViewValue_Format *vvf2)
 {
     ViewValue_Format *vvfRet;
     int i, len;
-    //
+
     if (vvf2 == NULL)
         return vvf1;
-    //
+
     if (vvf1)
     {
         _viewValue_value_release(vvf1);
@@ -581,12 +577,12 @@ ViewValue_Format *viewValue_copy(ViewValue_Format *vvf1, ViewValue_Format *vvf2)
     }
     else
         vvfRet = (ViewValue_Format *)calloc(1, sizeof(ViewValue_Format));
-    //
+
     memcpy(vvfRet->name, vvf2->name, sizeof(vvfRet->name));
     vvfRet->type = vvf2->type;
     vvfRet->vSize = vvf2->vSize;
-    vvfRet->param[0] = vvf2->param[0];
-    vvfRet->param[1] = vvf2->param[1];
+    vvfRet->sep = vvf2->sep;
+    vvfRet->zero = vvf2->zero;
     switch (vvf2->type)
     {
     case VT_CHAR:
@@ -637,10 +633,10 @@ ViewValue_Format *viewValue_arrayAdd(ViewValue_Format *vvf, ...)
     void **tempArray;
     void *tempPoi;
     int len;
-    //
+
     if (vvf == NULL)
         return NULL;
-    //
+
     va_start(ap, vvf);
     switch (vvf->type)
     {
@@ -649,7 +645,6 @@ ViewValue_Format *viewValue_arrayAdd(ViewValue_Format *vvf, ...)
         tempArray = (void **)calloc(len + 1 + 1, sizeof(char *));
         //拷贝原有值
         memcpy(tempArray, vvf->value.PointArray, len * sizeof(char *));
-        //
         tempPoi = va_arg(ap, char *);
         if (tempPoi)
         {
@@ -668,7 +663,7 @@ ViewValue_Format *viewValue_arrayAdd(ViewValue_Format *vvf, ...)
         tempArray = (void **)calloc(len + 1 + 1, sizeof(void *));
         //拷贝原有值
         memcpy(tempArray, vvf->value.PointArray, len * sizeof(void *));
-        //
+
         tempPoi = va_arg(ap, void *);
         tempArray[len] = tempPoi;
         //移花接木
@@ -713,7 +708,7 @@ ViewValue_Format *viewValue_arrayAdd(ViewValue_Format *vvf, ...)
         break;
     }
     va_end(ap);
-    //
+
     return vvf;
 }
 
@@ -721,10 +716,10 @@ ViewValue_Format *viewValue_arrayRemoveByNum(ViewValue_Format *vvf, int num)
 {
     void *tempPoi;
     int count, len;
-    //
+
     if (vvf == NULL || num < 0)
         return NULL;
-    //
+
     switch (vvf->type)
     {
     case VT_STRING_ARRAY:
@@ -786,7 +781,7 @@ ViewValue_Format *viewValue_arrayRemoveByNum(ViewValue_Format *vvf, int num)
     default:
         break;
     }
-    //
+
     return vvf;
 }
 
@@ -826,11 +821,10 @@ cover.bmp\log.jpg\roverCover.jpg\
 
 #define VVF_SL_SHOW_HEX 0
 
-//
 void _viewValue_save(FILE *fd, ViewValue_Format *vvf)
 {
     int j;
-    //
+
     switch (vvf->type)
     {
     case VT_CHAR:
@@ -889,7 +883,7 @@ void _viewValue_save(FILE *fd, ViewValue_Format *vvf)
     default:
         break;
     }
-    //
+
     if (vvf->next)
         _viewValue_save(fd, vvf->next);
 }
@@ -898,27 +892,26 @@ void _viewValue_save(FILE *fd, ViewValue_Format *vvf)
 int viewValue_save(char *filePath, ViewValue_Format *array, int arrayLen)
 {
     ViewValue_Format *vvf = array;
-    //
+
     if (!filePath || !array || arrayLen < 1)
         return 0;
-    //
+
     FILE *fd;
     if ((fd = fopen(filePath, "w")) == NULL)
     {
         fprintf(stderr, "open write failed ! %s %d\n", filePath, arrayLen);
         return 0;
     }
-    //
+
     int i;
     for (i = 0; i < arrayLen && vvf; i++)
         _viewValue_save(fd, vvf++);
-    //
+
     fclose(fd);
-    //
+
     return arrayLen;
 }
 
-//
 typedef struct VvfLoadStat
 {
     ViewValue_Format *vvf;
@@ -926,11 +919,9 @@ typedef struct VvfLoadStat
     struct VvfLoadStat *next;
 } VvfLoadStat_Struct;
 
-//
 VvfLoadStat_Struct *VvfLoadStat_browse(ViewValue_Format *array, int *count)
 {
     VvfLoadStat_Struct *vlss = NULL;
-    //
     if (array)
     {
         *count += 1;
@@ -938,10 +929,9 @@ VvfLoadStat_Struct *VvfLoadStat_browse(ViewValue_Format *array, int *count)
         vlss->vvf = array;
         vlss->next = VvfLoadStat_browse(array->next, count);
     }
-    //
     return vlss;
 }
-//
+
 void VvfLoadStat_release(VvfLoadStat_Struct *vlss)
 {
     VvfLoadStat_Struct *current, *next;
@@ -958,7 +948,6 @@ void VvfLoadStat_release(VvfLoadStat_Struct *vlss)
 
 #define LOAD_LINE_SIZE 10240
 
-//
 int _viewValue_load_string(FILE *fd, char *line, char **str)
 {
     int ret = strlen(line);
@@ -976,7 +965,7 @@ int _viewValue_load_string(FILE *fd, char *line, char **str)
                 break;
             }
             ret += strlen(&line[ret]);
-            //
+
             if (ret >= LOAD_LINE_SIZE)
                 ret = LOAD_LINE_SIZE + 2;
         }
@@ -993,7 +982,7 @@ int _viewValue_load_string(FILE *fd, char *line, char **str)
         *str = (char *)calloc(ret + 1, 1);
         strncpy(*str, line, ret);
     }
-    //
+
     return ret;
 }
 
@@ -1002,8 +991,8 @@ int viewValue_load(char *filePath, ViewValue_Format *array, int arrayLen)
 {
     if (!filePath || !array || arrayLen < 1)
         return 0;
-    //
-    int i, hit = 0, count = 0; //匹配计数
+    //匹配计数
+    int i, hit = 0, count = 0;
     //指针统计成链表 方便遍历和跳过已匹配的项
     VvfLoadStat_Struct *vlss = NULL, *vlssTemp;
     if ((vlss = vlssTemp = VvfLoadStat_browse(array, &count))) //第一个
@@ -1015,7 +1004,7 @@ int viewValue_load(char *filePath, ViewValue_Format *array, int arrayLen)
             vlssTemp->next = VvfLoadStat_browse(&array[i], &count);
         }
     }
-    //
+
     FILE *fd;
     if ((fd = fopen(filePath, "r")) == NULL)
     {
@@ -1028,7 +1017,7 @@ int viewValue_load(char *filePath, ViewValue_Format *array, int arrayLen)
     ViewValue_Format vvfTemp, *vvfPoint;
     //用于比较
     int vSize;
-    //
+
     while (1)
     {
         if (feof(fd))
@@ -1130,7 +1119,7 @@ int viewValue_load(char *filePath, ViewValue_Format *array, int arrayLen)
                                    vvfTemp.name, vvfTemp.type, vSize, vlssTemp->vvf->vSize);
                         }
                     }
-                    //
+
                     vlssTemp = vlssTemp->next;
                 }
                 //成功匹配
@@ -1252,9 +1241,9 @@ int viewValue_load(char *filePath, ViewValue_Format *array, int arrayLen)
             }
         }
     }
-    //
+
     fclose(fd);
     VvfLoadStat_release(vlss);
-    //
+
     return hit;
 }

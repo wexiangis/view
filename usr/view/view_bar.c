@@ -6,9 +6,9 @@ int view_bar_vStart(View_Struct *view, void *object, View_Focus *focus, ViewButt
     static int tickSec = 0;
 
     //1秒周期
-    if (view->tickMs / 1000 != tickSec)
+    if (view->tickOfTimeMs / 1000 != tickSec)
     {
-        tickSec = view->tickMs / 1000 % 60;
+        tickSec = view->tickOfTimeMs / 1000 % 60;
         //更新时间
         view->view->text->value.IntArray[2] = tickSec;
         view_set_alpha(view->view->textColor, tickSec % 25 * 10);
@@ -28,8 +28,8 @@ View_Struct *view_bar_init(void)
     //日期 : 在父控件左边(内部)
     vsTemp = view_init("bar-date", BAR_DATE_WIDTH, BAR_HEIGHT, VRT_LEFT, 0);
     vsTemp->text = viewValue_init("date", VT_INT_ARRAY, 3, 2021, 3, 19);
-    vsTemp->text->param[0] = '/'; //分隔符
-    vsTemp->text->param[1] = 2;   //保留2个0
+    vsTemp->text->sep = '/'; //分隔符
+    vsTemp->text->zero = 2;   //保留2个0
     vsTemp->textSize = 240;
     vsTemp->textColor = 0x80FFFFFF;
     view_add(vs, vsTemp, false);
@@ -44,7 +44,7 @@ View_Struct *view_bar_init(void)
     vsTemp = view_init(
         "bar-batt-percent", BAR_BATT_WIDTH, BAR_HEIGHT, VRT_LEFT, VRNT_LAST);
     vsTemp->text = viewValue_init("percent", VT_INT_ARRAY, 1, 95);
-    vsTemp->text->param[0] = '%'; //分隔符
+    vsTemp->text->sep = '%'; //分隔符
     vsTemp->textSize = 240;
     vsTemp->textColor = 0xFF0000;
     view_add(vs, vsTemp, false);

@@ -42,10 +42,13 @@ typedef struct ViewValueFormat
 {
     //[互斥锁]
     pthread_mutex_t lock;
+
     //[类型]
     ViewValue_Type type;
+
     //[名称]
     char name[VIEW_VALUE_NAME_LEN];
+
     //[这是一块固定大小的内存,用来存储任意类型数据]
     union {
         char Char;
@@ -60,6 +63,7 @@ typedef struct ViewValueFormat
         void *Point;
         void **PointArray;
     } value;
+
     //[描述value内存大小的变量]
     //value 为普通变量时:
     //      vSize 值为变量大小字节数
@@ -71,16 +75,25 @@ typedef struct ViewValueFormat
     //      vSize = 数组长度 * sizeof(void *)
     //      StringArray 里的每个字符串长度是任意的
     int vSize;
-    //单向链表
+
+    //[单向链表]
     struct ViewValueFormat *next;
-    //[多用途参数]
-    //param[0]: value 为数组时(**StringArray,*DoubleArray,*BoolArray), 指定打印的分隔符
-    //      例如: param[0]='/', Api输出时: "Tom/25/Man"
+
+    //[分隔符]
+    //value 为数组时(**StringArray,*DoubleArray,*BoolArray), 指定打印的分隔符
+    //      例如: sep = '/', Api输出时: "Tom/25/Man"
     //      0/默认: 使用逗号','
-    //param[1]: value 为浮点数时(Double,*DoubleArray), 指定保留小数位数
-    //      例如: param[0]=' ',param[1]=2, Api输出时: "12.34 98.01 1.20"
+    //特殊情况: 当value为数组而元素只有一个时,该字符会被当作单位符号而显示
+    char sep;
+
+    //[小数和补0]
+    //value 为浮点数时(Double,*DoubleArray), 指定保留小数位数
+    //      例如: sep =' ', zero = 2, Api输出时: "12.34 98.01 1.20"
     //      0/默认:  浮点数保留6位小数
-    char param[2];
+    //value 为整型时(Int,*IntArray), 指定前面补0位数
+    //      例如: sep =' ', zero = 4, Api输出时: "0001 0120 1234 12345(数值超出时不再补0)"
+    //      0/默认:  不补0
+    uint8_t zero;
 } ViewValue_Format;
 
 //========== 形状封装 ==========
@@ -319,11 +332,6 @@ typedef struct ViewStruct
 
     //==================== 位置参数 ====================
 
-    //绘制同步标志,用于标记当前 view 是否已经计算过位置信息 [系统赋值]
-    //通过缓存该值,比较是否每次+1来判断是否第一次进入自己的界面
-    uint8_t drawSync;
-    uint8_t drawSyncOld;
-
     //宽高 直接指定数值或使用如下宏
     //宏定义: VWHT_MATCH, VWHT_MATCH*n : 父级控件长,父级控件长的1/n
     //宏定义: VWHT_FULL, VWHT_FULL*n : 屏幕长,屏幕长的1/n
@@ -485,7 +493,12 @@ typedef struct ViewStruct
     //---------- 其它标注 ----------
 
     //系统滴答时钟,省去回调函数内周期任务的计时 [系统赋值]
-    int tickMs;
+    uint32_t tickOfTimeMs;
+
+    //绘制同步标志,用于标记当前 view 是否已经计算过位置信息 [系统赋值]
+    //通过缓存该值,比较是否每次+1来判断是否第一次进入自己的界面
+    uint32_t tickOfDraw;
+    uint32_t tickOfDrawLast;
 
     //---------- 自定义绘图 ----------
 
@@ -512,7 +525,7 @@ typedef struct ViewStruct
     bool silence;
 
     //第一次绘制该界面
-    bool firstIn;
+    bool isFirstIn;
 
     //==================== 子 view ====================
 

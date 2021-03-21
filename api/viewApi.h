@@ -28,8 +28,24 @@ void print_en(void);
 
 //--------------------- 延时和时间 --------------------
 
+void view_delayus(uint32_t us);
 void view_delayms(uint32_t ms);
+
+long view_tickUs(void);
 int view_tickMs(void);
+
+// 周期延时初始化
+#define VIEW_DELAY_INIT \
+    long _tick1 = 0, _tick2;
+
+// 周期延时,按时差变化动态延时
+#define VIEW_DELAY_US(us)                        \
+    _tick2 = view_tickUs();                      \
+    if (_tick2 > _tick1 && _tick2 - _tick1 < us) \
+        view_delayus(us - (_tick2 - _tick1));    \
+    _tick1 = view_tickUs();
+
+// 获取系统时间
 struct tm *view_time(void);
 
 //--------------------- 颜色和图片 --------------------
@@ -82,7 +98,8 @@ void viewTrash_clean(void);
 
 //-------------------- 控件的绘制 ----------------------
 
-int view_draw(
+int view_draw(void *object, View_Struct *view);
+int view_draw2(
     void *object,
     View_Focus *focus,
     ViewButtonTouch_Event *event,

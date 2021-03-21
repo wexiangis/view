@@ -20,7 +20,7 @@ static View_Struct ViewCommonParent = {
     .absWidth = VIEW_X_SIZE,
     .absHeight = VIEW_Y_SIZE,
     .absXY = {{0, 0}, {VIEW_X_END, VIEW_Y_END}},
-    .drawSync = 1,
+    .tickOfDraw = 1,
 };
 
 //纵向输入列表最后选中项的序号(从0数起)
@@ -100,27 +100,29 @@ void print_en(void)
 
 //--------------------- 延时和时间 --------------------
 
-void view_delayms(uint32_t ms)
+void view_delayus(uint32_t us)
 {
     struct timeval delay;
-    if (ms > 1000)
-    {
-        delay.tv_sec = ms / 1000;
-        delay.tv_usec = (ms % 1000) * 1000;
-    }
-    else
-    {
-        delay.tv_sec = 0;
-        delay.tv_usec = ms * 1000;
-    }
+    delay.tv_sec = us / 1000000;
+    delay.tv_usec = us % 1000000;
     select(0, NULL, NULL, NULL, &delay);
+}
+
+void view_delayms(uint32_t ms)
+{
+    view_delayus(ms * 1000);
+}
+
+long view_tickUs(void)
+{
+    struct timeval tv = {0};
+    gettimeofday(&tv, NULL);
+    return (long)(tv.tv_sec * 1000000 + tv.tv_usec);
 }
 
 int view_tickMs(void)
 {
-    struct timeval tv = {0};
-    gettimeofday(&tv, NULL);
-    return (int)(tv.tv_sec * 1000 + tv.tv_usec / 1000);
+    return (int)(view_tickUs() / 1000);
 }
 
 struct tm *view_time(void)
@@ -2107,7 +2109,7 @@ FOCUS_ENENT_ENTER:
 
 //--------------------  viewTool draw --------------------
 
-void _viewTool_viewLocal(char drawSync, View_Struct *view, int width, int height, int xy[2][2])
+void _viewTool_viewLocal(uint32_t tickOfDraw, View_Struct *view, int width, int height, int xy[2][2])
 {
     View_Struct *rView = view;
     int intTemp = 0;
@@ -2163,8 +2165,8 @@ void _viewTool_viewLocal(char drawSync, View_Struct *view, int width, int height
     {
         rView = view_num(view, view->rNumber);
         if (rView != view &&
-            rView->drawSync != drawSync)
-            _viewTool_viewLocal(drawSync, rView, width, height, xy);
+            rView->tickOfDraw != tickOfDraw)
+            _viewTool_viewLocal(tickOfDraw, rView, width, height, xy);
     }
 
     if (view->centerX)
@@ -2245,7 +2247,7 @@ void _viewTool_viewLocal(char drawSync, View_Struct *view, int width, int height
         view->absXY[1][1] = view->absXY[0][1] + view->absHeight - 1;
     }
 
-    view->drawSync = drawSync;
+    view->tickOfDraw = tickOfDraw;
 }
 
 char *_viewTool_textPrint(ViewValue_Format *value, ViewPrint_Struct *vps)
@@ -2304,18 +2306,18 @@ char *_viewTool_textPrint(ViewValue_Format *value, ViewPrint_Struct *vps)
         sprintf(vps->textOutput, "%d", value->value.Int);
         break;
     case VT_DOUBLE:
-        if (value->param[1])
-            strDemoDouble[2] = (value->param[1] % 10) + '0'; //指定保留小数位数
+        if (value->zero)
+            strDemoDouble[2] = (value->zero % 10) + '0'; //指定保留小数位数
         sprintf(vps->textOutput, strDemoDouble, value->value.Double);
         break;
     case VT_BOOL:
         sprintf(vps->textOutput, "%s", value->value.Bool ? "true" : "false");
         break;
     case VT_INT_ARRAY:
-        if (value->param[0] && value->param[0] != '%')
-            strDemoIntArray[4] = value->param[0]; //指定分隔符
-        if (value->param[1])
-            strDemoIntArray[2] = (value->param[1] % 10) + '0'; //指定高位补0数量
+        if (value->sep && value->sep != '%')
+            strDemoIntArray[4] = value->sep; //指定分隔符
+        if (value->zero)
+            strDemoIntArray[2] = (value->zero % 10) + '0'; //指定高位补0数量
         for (i = 0, count = 0; i < value->vSize / sizeof(int); i += 1)
         {
             ret = sprintf(&vps->textOutput[count], strDemoIntArray, value->value.IntArray[i]);
@@ -2323,13 +2325,13 @@ char *_viewTool_textPrint(ViewValue_Format *value, ViewPrint_Struct *vps)
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
         vps->textOutput[count - 1] =
-            (i == 1 && value->param[0]) ? value->param[0] : 0;
+            (i == 1 && value->sep) ? value->sep : 0;
         break;
     case VT_DOUBLE_ARRAY:
-        if (value->param[0] && value->param[0] != '%')
-            strDemoDoubleArray[5] = value->param[0]; //指定分隔符
-        if (value->param[1])
-            strDemoDoubleArray[2] = (value->param[1] % 10) + '0'; //指定保留小数位数
+        if (value->sep && value->sep != '%')
+            strDemoDoubleArray[5] = value->sep; //指定分隔符
+        if (value->zero)
+            strDemoDoubleArray[2] = (value->zero % 10) + '0'; //指定保留小数位数
         for (i = 0, count = 0; i < value->vSize / sizeof(double); i += 1)
         {
             ret = sprintf(&vps->textOutput[count], strDemoDoubleArray, value->value.DoubleArray[i]);
@@ -2337,11 +2339,11 @@ char *_viewTool_textPrint(ViewValue_Format *value, ViewPrint_Struct *vps)
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
         vps->textOutput[count - 1] =
-            (i == 1 && value->param[0]) ? value->param[0] : 0;
+            (i == 1 && value->sep) ? value->sep : 0;
         break;
     case VT_BOOL_ARRAY:
-        if (value->param[0] && value->param[0] != '%')
-            strDemoStrArray[2] = value->param[0]; //指定分隔符
+        if (value->sep && value->sep != '%')
+            strDemoStrArray[2] = value->sep; //指定分隔符
         for (i = 0, count = 0; i < value->vSize / sizeof(bool); i += 1)
         {
             ret = sprintf(&vps->textOutput[count], strDemoStrArray, value->value.BoolArray[i] ? "true" : "false");
@@ -2349,11 +2351,11 @@ char *_viewTool_textPrint(ViewValue_Format *value, ViewPrint_Struct *vps)
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
         vps->textOutput[count - 1] =
-            (i == 1 && value->param[0]) ? value->param[0] : 0;
+            (i == 1 && value->sep) ? value->sep : 0;
         break;
     case VT_STRING_ARRAY:
-        if (value->param[0] && value->param[0] != '%')
-            strDemoStrArray[2] = value->param[0]; //指定分隔符
+        if (value->sep && value->sep != '%')
+            strDemoStrArray[2] = value->sep; //指定分隔符
         for (i = 0, count = 0; i < value->vSize / sizeof(char *); i += 1)
             count += strlen(value->value.StringArray[i]) + 1;
         if (count > vps->textOutputLen)
@@ -2368,7 +2370,7 @@ char *_viewTool_textPrint(ViewValue_Format *value, ViewPrint_Struct *vps)
         }
         //当数组只有一个元素时,补全最后的分隔符,否则丢弃
         vps->textOutput[count - 1] =
-            (i == 1 && value->param[0]) ? value->param[0] : 0;
+            (i == 1 && value->sep) ? value->sep : 0;
         break;
     default:
         return NULL;
@@ -2387,7 +2389,7 @@ static uint32_t _viewTool_lockColor(uint32_t color)
     return *((uint32_t *)p);
 }
 
-void _view_draw(View_Struct *view, int xyLimit[2][2])
+static void _view_draw(View_Struct *view, int xyLimit[2][2])
 {
     int widthTemp = 0, heightTemp = 0;
     uint32_t colorTemp = 0, colorTemp2 = 0;
@@ -3269,7 +3271,7 @@ int _viewTool_viewListDraw(
     {
         vsNext = vsThis->next;
 
-        ret = view_draw(object, focus, event, viewParent, vsThis, xyLimit);
+        ret = view_draw2(object, focus, event, viewParent, vsThis, xyLimit);
         if (ret == CALLBACK_BREAK)
             return CALLBACK_BREAK;
 
@@ -3278,7 +3280,7 @@ int _viewTool_viewListDraw(
     return CALLBACK_OK;
 }
 
-int view_draw(
+int view_draw2(
     void *object,
     View_Focus *focus,
     ViewButtonTouch_Event *event,
@@ -3293,7 +3295,7 @@ int view_draw(
     if (!view)
         return CALLBACK_OK;
 
-    // printf("view_draw: %s \r\n", view->name?view->name:"NULL");
+    // printf("view_draw2: %s \r\n", view->name?view->name:"NULL");
 
     //禁止回调函数检查
     view->callBackForbid = true;
@@ -3311,23 +3313,23 @@ int view_draw(
     if (parent == &ViewCommonParent)
     {
         //避免多条线同时使用 ViewCommonParent 作父控件
-        //造成 drawSync 的跳变增加; 子 view 可以通过缓存
+        //造成 tickOfDraw 的跳变增加; 子 view 可以通过缓存
         //该值,比较是否每次+1来判断是否第一次进入自己的界面
-        ViewCommonParent.drawSync = view->drawSync + 1;
+        ViewCommonParent.tickOfDraw += 1;
 
         //更新一次 ViewCommonParent 的系统滴答时钟
-        ViewCommonParent.tickMs = view_tickMs();
+        ViewCommonParent.tickOfTimeMs = view_tickMs();
     }
 
     //共享滴答时钟
-    view->tickMs = ViewCommonParent.tickMs;
+    view->tickOfTimeMs = ViewCommonParent.tickOfTimeMs;
 
     //当前view是第一次绘制
-    if (view->drawSync != parent->drawSync)
+    if (view->tickOfDraw != parent->tickOfDraw)
     {
         //absXY[2][2] 和 absWidth, absHeight 计算
         _viewTool_viewLocal(
-            parent->drawSync, view,
+            parent->tickOfDraw, view,
             parent->absWidth, parent->absHeight, parent->absXY);
     }
 
@@ -3347,7 +3349,7 @@ int view_draw(
             xyLimitVsTemp[1][1] = xyLimit[1][1];
     }
 
-    // printf("view_draw: %s %d[%d-%d](%d-%d) %d[%d-%d](%d-%d), sync: %d -- %d\r\n",
+    // printf("view_draw2: %s %d[%d-%d](%d-%d) %d[%d-%d](%d-%d), sync: %d -- %d\r\n",
     //     view->name,
     //     view->absWidth,
     //     view->absXY[0][0], view->absXY[1][0],
@@ -3355,7 +3357,7 @@ int view_draw(
     //     view->absHeight,
     //     view->absXY[0][1], view->absXY[1][1],
     //     xyLimitVsTemp[0][1], xyLimitVsTemp[1][1],
-    //     view->drawSync, ViewCommonParent.drawSync);
+    //     view->tickOfDraw, ViewCommonParent.tickOfDraw);
 
     //开始绘图
     if (view->disable ||
@@ -3364,13 +3366,13 @@ int view_draw(
         ;
     else
     {
-        //firstIn ?
-        view->drawSyncOld += 1;
-        if (view->drawSyncOld != view->drawSync)
-            view->firstIn = true;
+        //isFirstIn ?
+        view->tickOfDrawLast += 1;
+        if (view->tickOfDrawLast != view->tickOfDraw)
+            view->isFirstIn = true;
         else
-            view->firstIn = false;
-        view->drawSyncOld = view->drawSync;
+            view->isFirstIn = false;
+        view->tickOfDrawLast = view->tickOfDraw;
 
         //viewStart
         if (view->viewStart)
@@ -3389,7 +3391,7 @@ int view_draw(
                 return CALLBACK_BREAK;
             }
             else if (ret == CALLBACK_ERR) //异常错误 打印
-                printf("view_draw : view %s viewStart() err !!\r\n", view->name ? view->name : "???");
+                printf("view_draw2 : view %s viewStart() err !!\r\n", view->name ? view->name : "???");
         }
 
         //在 jumpView 无效或 jumpViewKeepOn 的情况下可以绘制: view, 子view
@@ -3417,7 +3419,7 @@ int view_draw(
         //跳转 view
         if (view->jumpView && (view->jumpViewOn || view->jumpViewKeepOn))
         {
-            ret = view_draw(object, focus, event, view, view->jumpView, xyLimit); //子 view 直接继承限制范围
+            ret = view_draw2(object, focus, event, view, view->jumpView, xyLimit); //子 view 直接继承限制范围
             if (ret == CALLBACK_BREAK)
             {
                 view->callBackForbid = false; //允许回调函数检查
@@ -3442,13 +3444,18 @@ int view_draw(
                 return CALLBACK_BREAK;
             }
             else if (ret == CALLBACK_ERR) //异常错误 打印
-                printf("view_draw : view %s viewEnd() err !!\r\n", view->name ? view->name : "???");
+                printf("view_draw2 : view %s viewEnd() err !!\r\n", view->name ? view->name : "???");
         }
     }
 
     view->callBackForbid = false; //允许回调函数检查
 
     return CALLBACK_OK;
+}
+
+int view_draw(void *object, View_Struct *view)
+{
+    return view_draw2(object, NULL, NULL, NULL, view, NULL);
 }
 
 ViewCallBack view_touchLocal(int xy[2], View_Struct *view, View_Struct **retView)
@@ -4110,7 +4117,7 @@ void view_input(
     ibs->contentMinSize = contentMinSize;
     vs->width = VWHT_MATCH;
     vs->height = VWHT_MATCH;
-    sprintf(vs->name, "_input_%d", backView->drawSync);
+    sprintf(vs->name, "_input_%d", backView->tickOfDraw);
     // vs->rLeftRightErr = -vsParent->absXY[0][0];
     // vs->rTopBottomErr = -vsParent->absXY[0][1];
     // vs->backGroundColor = ViewColor.BackGround;//暗幕
@@ -4434,8 +4441,8 @@ void view_input(
                 // vsTemp->shapeType = VST_RECT;
                 // vsTemp->shape.rect.rad = rad;
                 vsTemp->text = vvfArray[count];
-                vsTemp->text->param[0] = value->param[0];
-                vsTemp->text->param[1] = value->param[1];
+                vsTemp->text->sep = value->sep;
+                vsTemp->text->zero = value->zero;
                 vsTemp->textColor = ViewColor.Tips;
                 // vsTemp->textEdgeLeft = vsTemp->textEdgeRight = 5;//左右保持5的间距
                 vsTemp->scroll = 4; //自动滚动
@@ -4526,8 +4533,8 @@ void view_input(
             valueStringPoint = numberValueString;
             break;
         case VT_DOUBLE:
-            if (value->param[1] > 0)
-                strDemo[2] = (value->param[1] % 10) + '0';
+            if (value->zero > 0)
+                strDemo[2] = (value->zero % 10) + '0';
             sprintf(numberValueString, strDemo, value->value.Double);
             valueStringPoint = numberValueString;
             break;

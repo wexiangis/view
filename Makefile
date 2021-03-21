@@ -74,8 +74,6 @@ ROOT = $(shell pwd)
 
 # 源文件包含
 DIR += ./api
-DIR += ./usr
-DIR += ./usr/view
 # 库文件路径 -L
 LIB += -L./libs/lib
 # 头文件路径 -I
@@ -85,16 +83,25 @@ INC += $(foreach n,$(DIR),-I$(n))
 # 其它编译参数
 CFLAG += -Wall -lm -lpthread
 # 遍历DIR统计所有.o文件
-OBJS = $(foreach n,$(DIR),${patsubst %.c,$(n)/%.o,${notdir ${wildcard $(n)/*.c}}})
+OBJ = $(foreach n,$(DIR),${patsubst %.c,$(n)/%.o,${notdir ${wildcard $(n)/*.c}}})
 
 %.o: %.c
 	@$(GCC) -c $< $(INC) $(LIB) $(CFLAG) $(DEF) -o $@
 
-out: $(OBJS)
-	@$(GCC) -o out $(OBJS) $(INC) $(LIB) $(CFLAG) $(DEF)
+# usr文件夹不参与.o中间文件编译
+DIR-USR += ./usr
+DIR-USR += ./usr/view
+INC-USR += $(foreach n,$(DIR-USR),-I$(n))
+SRC-USR = $(foreach n,$(DIR-USR),${patsubst %.c,$(n)/%.c,${notdir ${wildcard $(n)/*.c}}})
+
+app: $(OBJ)
+	@$(GCC) -o app $(SRC-USR) $(OBJ) $(INC) $(INC-USR) $(LIB) $(CFLAG) $(DEF)
+
+demo: $(OBJ)
+	@$(GCC) -o demo ./example/demo.c $(OBJ) $(INC) $(LIB) $(CFLAG) $(DEF)
 
 clean:
-	@rm out $(OBJS) -rf
+	@rm app demo $(OBJ) -rf
 
 cleanall: clean
 	@rm ./libs/* -rf
