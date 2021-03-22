@@ -1,6 +1,7 @@
 #ifndef _VIEWDEF_H_
 #define _VIEWDEF_H_
 
+
 //ttf解析库
 #define MAKE_FREETYPE 1
 

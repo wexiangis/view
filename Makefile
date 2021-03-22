@@ -2,10 +2,10 @@
 # cross = arm-linux-gnueabihf
 # cross = arm-himix200-linux
 # cross = arm-himix100-linux
-cross = mips-linux-gnu
+# cross = mips-linux-gnu
 
 # T31平台额外配置
-CFLAG += -Wl,-gc-sections -lrt -ldl
+# CFLAG += -Wl,-gc-sections -lrt -ldl
 
 # 用于依赖库编译
 GCC = gcc
@@ -20,6 +20,9 @@ endif
 
 # 根目录获取
 ROOT = $(shell pwd)
+
+# 编译日期
+MAKE_DATE = "$(shell date +%Y-%m-%H:%M:%S)"
 
 # 源文件包含
 DIR += $(ROOT)/api
@@ -65,6 +68,7 @@ libui: $(OBJ)
 	rm -rf $(ROOT)/api/*.o && \
 	mkdir $(ROOT)/libs/include/ui -p && \
 	cp -rf $(ROOT)/api/*.h $(ROOT)/libs/include/ui && \
+	sed -i '3a\#define MAKE_DATE $(MAKE_DATE)\' $(ROOT)/libs/include/ui/viewDef.h && \
 	echo "output: $(ROOT)/libs/lib/libui.a"
 
 # 用于辅助生成动态库的工具
