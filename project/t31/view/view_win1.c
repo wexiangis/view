@@ -15,7 +15,7 @@ View_Struct *view_win1_init(void)
     vs->width = WINDOW_WIDTH;
     vs->height = WINDOW_HEIGHT;
     vs->rType = VRT_BOTTOM;
-    vs->picPath = "./usr/src/fruits.jpg";
+    vs->picPath = SRC_PATH"/fruits.jpg";
     vs->viewStart = (ViewCallBack)&view_win1_vStart;
 
     vsTemp = (View_Struct *)calloc(1, sizeof(View_Struct));

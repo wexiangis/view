@@ -5,7 +5,10 @@
 #ifndef _VIEWINC_H_
 #define _VIEWINC_H_
 
-#include "viewApi.h"
+#include "ui/viewApi.h"
+
+//源文件路径
+#define SRC_PATH "./project/t31/src"
 
 //刷屏周期
 #define REFRESH_MS 500

@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-#include "viewApi.h"
+#include "ui/viewApi.h"
 #include "viewInc.h"
 
 int main(void)

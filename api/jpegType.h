@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 //如果Makefile没有定义则自行定义
+#include "viewDef.h"
 #ifndef MAKE_JPEG
 #define MAKE_JPEG 1
 #endif

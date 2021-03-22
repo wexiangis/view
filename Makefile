@@ -1,114 +1,71 @@
-
-# 平台选择
-#   0: 通用平台输出图像到framebuffer
-#   1: T31平台
-MAKE_PLATFORM = 0
-
-##### 通用fb平台对接 #####
-ifeq ($(MAKE_PLATFORM),0)
+# 交叉编译器选择
 # cross = arm-linux-gnueabihf
 # cross = arm-himix200-linux
 # cross = arm-himix100-linux
-DIR += ./platform/fb
-endif
-
-##### T31平台配置 #####
-ifeq ($(MAKE_PLATFORM),1)
 cross = mips-linux-gnu
-DIR += ./platform/t31
+
+# T31平台额外配置
 CFLAG += -Wl,-gc-sections -lrt -ldl
-# 使用 uclibc 时添加该项,但很多三方库不支持uclibc
-# CFLAG += -muclibc
-endif
-
-# 静态编译(优先使用.a库文件编译,程序直接能跑,但文件巨大,部分库还不支持)
-# CFLAG += -static
-
-# 启用ttf字体支持 (0/不启用 1/启用)
-MAKE_FREETYPE ?= 1
-# 启用jpeg文件支持 (0/不启用 1/启用)
-MAKE_JPEG ?= 1
-# 启用png文件支持 (0/不启用 1/启用)
-MAKE_PNG ?= 1
-# 启用hiredis支持 (0/不启用 1/启用)
-MAKE_HIREDIS ?= 1
-
-# 根据 MAKE_XXX 统计要编译的库列表
-ifeq ($(MAKE_FREETYPE),1)
-BUILD += libfreetype
-CFLAG += -lfreetype
-INC += -I./libs/include/freetype2
-endif
-ifeq ($(MAKE_JPEG),1)
-BUILD += libjpeg
-CFLAG += -ljpeg
-endif
-ifeq ($(MAKE_PNG),1)
-BUILD += libpng
-CFLAG += -lz -lpng
-endif
-ifeq ($(MAKE_HIREDIS),1)
-BUILD += libhiredis
-CFLAG += -lhiredis
-INC += -I./libs/include/hiredis
-endif
-
-# 传递宏定义给代码
-DEF += -DMAKE_PLATFORM=$(MAKE_PLATFORM)
-DEF += -DMAKE_FREETYPE=$(MAKE_FREETYPE)
-DEF += -DMAKE_JPEG=$(MAKE_JPEG)
-DEF += -DMAKE_PNG=$(MAKE_PNG)
-DEF += -DMAKE_HIREDIS=$(MAKE_HIREDIS)
 
 # 用于依赖库编译
 GCC = gcc
 GPP = g++
+AR = ar
 ifdef cross
 	HOST = $(cross)
 	GCC = $(cross)-gcc
 	GPP = $(cross)-g++
+	AR = $(cross)-ar
 endif
 
 # 根目录获取
 ROOT = $(shell pwd)
 
 # 源文件包含
-DIR += ./api
-# 库文件路径 -L
-LIB += -L./libs/lib
+DIR += $(ROOT)/api
 # 头文件路径 -I
-INC += -I./libs/include
-# 包含所有源文件夹
+INC += -I$(ROOT)/libs/include
+INC += -I$(ROOT)/libs/include/freetype2
+INC += -I$(ROOT)/libs/include/hiredis
 INC += $(foreach n,$(DIR),-I$(n))
 # 其它编译参数
-CFLAG += -Wall -lm -lpthread
-# 遍历DIR统计所有.o文件
-OBJ = $(foreach n,$(DIR),${patsubst %.c,$(n)/%.o,${notdir ${wildcard $(n)/*.c}}})
+CFLAG += -Wall -lm -lpthread -lfreetype -ljpeg -lz -lpng -lhiredis
+# 静态编译
+CFLAG += -static
+
+# 遍历DIR统计UI所有.o文件
+OBJ += $(foreach n,$(DIR),${patsubst %.c,$(n)/%.o,${notdir ${wildcard $(n)/*.c}}})
 
 %.o: %.c
-	@$(GCC) -c $< $(INC) $(LIB) $(CFLAG) $(DEF) -o $@
+	@$(GCC) -c $< $(INC) $(CFLAG) $(DEF) -o $@
 
-# usr文件夹不参与.o中间文件编译
-DIR-USR += ./usr
-DIR-USR += ./usr/view
-INC-USR += $(foreach n,$(DIR-USR),-I$(n))
-SRC-USR = $(foreach n,$(DIR-USR),${patsubst %.c,$(n)/%.c,${notdir ${wildcard $(n)/*.c}}})
-
-app: $(OBJ)
-	@$(GCC) -o app $(SRC-USR) $(OBJ) $(INC) $(INC-USR) $(LIB) $(CFLAG) $(DEF)
-
-demo: $(OBJ)
-	@$(GCC) -o demo ./example/demo.c $(OBJ) $(INC) $(LIB) $(CFLAG) $(DEF)
+# 在这里添加自己的工程编译跳转
+demo:
+	@cd $(ROOT)/project/$@ && \
+	make GCC=$(GCC) && \
+	cd -
+t31:
+	@cd $(ROOT)/project/$@ && \
+	make GCC=$(GCC) && \
+	cd -
 
 clean:
-	@rm app demo $(OBJ) -rf
+	@rm -rf demo t31
 
 cleanall: clean
-	@rm ./libs/* -rf
+	@rm -rf $(ROOT)/libs/*
 
 # 所有依赖库
-libs: $(BUILD)
-	@echo "---------- make libs complete !! ----------"
+libs: libfreetype libpng libjpeg libhiredis libui
+	@rm $(ROOT)/libs/lib/*.la && \
+	echo "---------- make libs complete !! ----------"
+
+libui: $(OBJ)
+	@ar r $(ROOT)/libs/lib/libui.a $(OBJ) && \
+	rm -rf $(ROOT)/api/*.o && \
+	mkdir $(ROOT)/libs/include/ui -p && \
+	cp -rf $(ROOT)/api/*.h $(ROOT)/libs/include/ui && \
+	echo "output: $(ROOT)/libs/lib/libui.a"
 
 # 用于辅助生成动态库的工具
 libtool:
@@ -139,7 +96,7 @@ libjpeg: libtool
 libfreetype:
 	@tar -xzf $(ROOT)/pkg/freetype-2.10.4.tar.gz -C $(ROOT)/libs && \
 	cd $(ROOT)/libs/freetype-2.10.4 && \
-	./configure --prefix=$(ROOT)/libs --host=$(HOST) --enable-shared --with-bzip2=no --with-zlib=no --with-harfbuzz=no --with-png=no && \
+	./configure --prefix=$(ROOT)/libs --host=$(HOST) --enable-static --with-bzip2=no --with-zlib=no --with-harfbuzz=no --with-png=no && \
 	make -j4 && make install && \
 	cd - && \
 	rm $(ROOT)/libs/freetype-2.10.4 -rf

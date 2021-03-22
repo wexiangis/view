@@ -1,5 +1,5 @@
 .vscode
-libs/*
-out
-*.o
-test.*
+/libs/*
+/screen.bmp
+/demo
+/t31

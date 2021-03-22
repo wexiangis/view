@@ -2,6 +2,7 @@
 #define _HIREDISTYPE_H_
 
 //如果Makefile没有定义则自行定义
+#include "viewDef.h"
 #ifndef MAKE_HIREDIS
 #define MAKE_HIREDIS 1
 #endif

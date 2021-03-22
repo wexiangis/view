@@ -1,6 +1,8 @@
 
 #include <stdio.h>
-#include "viewApi.h"
+#include "ui/viewApi.h"
+
+#define SRC_PATH "./project/demo/src"
 
 int myView_vStart(View_Struct *view, void *object, View_Focus *focus, ViewButtonTouch_Event *event)
 {
@@ -33,7 +35,7 @@ View_Struct *myView_init(void)
     //本控件初始化,占用全屏
     vs = view_init("main", VWHT_FULL, VWHT_FULL, 0, 0);
     //窗口背景填充图片
-    vs->picPath = "./usr/src/fruits.jpg";
+    vs->picPath = SRC_PATH"/fruits.jpg";
     //注册绘制前回调函数
     vs->viewStart = (ViewCallBack)&myView_vStart;
 
@@ -74,7 +76,7 @@ View_Struct *myView_init(void)
     vsTemp->shape.rect.rad = 20;
     vsTemp->shapeColorPrint = 0xB000FFFF;
     //指定图片,会自动缩放为当前控件大小
-    vsTemp->picPath = "./usr/src/signal.png";
+    vsTemp->picPath = SRC_PATH"/signal.png";
     //添加到父控件链表
     view_add(vs, vsTemp, false);
 
@@ -87,7 +89,6 @@ int main(void)
 
     //UI系统初始化
     viewApi_init();
-
     //初始化自己的视图文件
     myView = myView_init();
 
@@ -103,10 +104,11 @@ int main(void)
         view_delayms(300);
     }
 
-    //内存回收,先删除(从原链表移除并添加到垃圾桶链表)
-    //用户不能再访问该指针
+    //内存回收示例
+    //删除函数(从原链表移除并添加到垃圾桶链表)
+    //删除后用户不能再访问该指针
     view_delete(myView);
-    //再清空垃圾桶
+    //再清空垃圾桶(从链表内彻底释放内存)
     viewTrash_clean();
 
     return 0;

@@ -13,6 +13,7 @@ typedef enum {
 } Png_Type;
 
 //如果Makefile没有定义则自行定义
+#include "viewDef.h"
 #ifndef MAKE_PNG
 #define MAKE_PNG 1
 #endif

@@ -36,8 +36,8 @@ View_Struct *view_bar_init(void)
 
     //电量图标 : 在父控件右边边(内部)
     vsTemp = view_init("bar-batt-icon", BAR_ICON_WIDTH, BAR_HEIGHT, VRT_RIGHT, 0);
-    // vsTemp->picPath = "./usr/src/edit.bmp";
-    vsTemp->picPath = "./usr/src/signal.png";
+    // vsTemp->picPath = SRC_PATH"/edit.bmp";
+    vsTemp->picPath = SRC_PATH"/signal.png";
     view_add(vs, vsTemp, false);
 
     //电量百分数 : 在上一控件(电量图标)的左边

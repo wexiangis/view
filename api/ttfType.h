@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 //如果Makefile没有定义则自行定义
+#include "viewDef.h"
 #ifndef MAKE_FREETYPE
 #define MAKE_FREETYPE 1
 #endif
