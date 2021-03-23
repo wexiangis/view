@@ -33,8 +33,6 @@ INC += -I$(ROOT)/libs/include/hiredis
 INC += $(foreach n,$(DIR),-I$(n))
 # 其它编译参数
 CFLAG += -Wall -lm -lpthread -lfreetype -ljpeg -lz -lpng -lhiredis
-# 静态编译
-CFLAG += -static
 
 # 遍历DIR统计UI所有.o文件
 OBJ += $(foreach n,$(DIR),${patsubst %.c,$(n)/%.o,${notdir ${wildcard $(n)/*.c}}})
