@@ -2169,11 +2169,17 @@ void _viewTool_viewLocal(uint32_t tickOfDraw, View_Struct *view, int width, int 
             _viewTool_viewLocal(tickOfDraw, rView, width, height, xy);
     }
 
+    //center时必定相对于父控件
     if (view->centerX)
     {
         view->absXY[0][0] = xy[0][0] + (width - view->absWidth) / 2 - 1;
-        view->absXY[1][0] = xy[0][0] + (width + view->absWidth) / 2 - 1;
+        //在子控件小于等于父控件尺寸时,尽量保留自控比例
+        if (width < view->absWidth)
+            view->absXY[1][0] = xy[0][0] + (width + view->absWidth) / 2 - 1;
+        else
+            view->absXY[1][0] = view->absXY[0][0] + width + view->absWidth - 1;
     }
+    //不等于自己,表示有相对对象
     else if (rView != view)
     {
         if ((view->rType & 0xF0) == VRT_RIGHT)
@@ -2188,10 +2194,14 @@ void _viewTool_viewLocal(uint32_t tickOfDraw, View_Struct *view, int width, int 
         }
         else
         {
-            view->absXY[0][0] = rView->absXY[0][0] + view->rLeftRightErr;
+            if (view->rLeftRightErr)
+                view->absXY[0][0] = rView->absXY[0][0] + view->rLeftRightErr;
+            else
+                view->absXY[0][0] = rView->absXY[0][0] + rView->absWidth / 2 - view->absWidth / 2;
             view->absXY[1][0] = view->absXY[0][0] + view->absWidth - 1;
         }
     }
+    //后面都是相对父控件
     else if ((view->rType & 0xF0) == VRT_RIGHT)
     {
         view->absXY[0][0] = xy[1][0] - view->rLeftRightErr - view->absWidth + 1;
@@ -2208,11 +2218,17 @@ void _viewTool_viewLocal(uint32_t tickOfDraw, View_Struct *view, int width, int 
         view->absXY[1][0] = view->absXY[0][0] + view->absWidth - 1;
     }
 
+    //center时必定相对于父控件
     if (view->centerY)
     {
         view->absXY[0][1] = xy[0][1] + (height - view->absHeight) / 2 - 1;
-        view->absXY[1][1] = xy[0][1] + (height + view->absHeight) / 2 - 1;
+        //在子控件小于等于父控件尺寸时,尽量保留自控比例
+        if (height < view->absHeight)
+            view->absXY[1][1] = xy[0][1] + (height + view->absHeight) / 2 - 1;
+        else
+            view->absXY[1][1] = view->absXY[0][1] + view->absHeight - 1;
     }
+    //不等于自己,表示有相对对象
     else if (rView != view)
     {
         if ((view->rType & 0x0F) == VRT_BOTTOM)
@@ -2227,10 +2243,14 @@ void _viewTool_viewLocal(uint32_t tickOfDraw, View_Struct *view, int width, int 
         }
         else
         {
-            view->absXY[0][1] = rView->absXY[0][1] + view->rTopBottomErr;
+            if (view->rTopBottomErr)
+                view->absXY[0][1] = rView->absXY[0][1] + view->rTopBottomErr;
+            else
+                view->absXY[0][1] = rView->absXY[0][1] + rView->absHeight / 2 - view->absHeight / 2;
             view->absXY[1][1] = view->absXY[0][1] + view->absHeight - 1;
         }
     }
+    //后面都是相对父控件
     else if ((view->rType & 0x0F) == VRT_BOTTOM)
     {
         view->absXY[0][1] = xy[1][1] - view->rTopBottomErr - view->absHeight + 1;
