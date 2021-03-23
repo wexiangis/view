@@ -22,7 +22,7 @@ endif
 ROOT = $(shell pwd)
 
 # 编译日期
-MAKE_DATE = "$(shell date +%Y-%m-%H:%M:%S)"
+MAKE_DATE = "$(shell date +%Y-%m-%d %H:%M:%S)"
 
 # 源文件包含
 DIR += $(ROOT)/api
