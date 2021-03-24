@@ -2313,6 +2313,7 @@ char *_viewTool_textPrint(ViewValue_Format *value, ViewPrint_Struct *vps)
         vps->textOutput[0] = value->value.Char;
         break;
     case VT_STRING:
+    case VT_POINT:
         return value->value.String;
     case VT_INT:
         sprintf(vps->textOutput, "%d", value->value.Int);
@@ -2366,6 +2367,7 @@ char *_viewTool_textPrint(ViewValue_Format *value, ViewPrint_Struct *vps)
             (i == 1 && value->sep) ? value->sep : 0;
         break;
     case VT_STRING_ARRAY:
+    case VT_POINT_ARRAY:
         if (value->sep && value->sep != '%')
             strDemoStrArray[2] = value->sep; //指定分隔符
         for (i = 0, count = 0; i < value->vSize / sizeof(char *); i += 1)

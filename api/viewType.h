@@ -60,8 +60,8 @@ typedef struct ViewValueFormat
         double *DoubleArray;
         bool Bool;
         bool *BoolArray;
-        void *Point;
-        void **PointArray;
+        void *Point;       // 用在 view->text 时会作为 String 打印
+        void **PointArray; // 用在 view->text 时会作为 StringArray 打印
     } value;
 
     //[描述value内存大小的变量]
@@ -277,7 +277,7 @@ typedef enum
 {
     VTST_CENTER = 0,       //居中(默认)
     VTST_LEFT_TOP = 1,     //靠在左边(textSideX)或上边(textSideY)
-    VSTT_RIGHT_BOTTOM = 2, //靠在右边(textSideX)或下边边(textSideY)
+    VTST_RIGHT_BOTTOM = 2, //靠在右边(textSideX)或下边边(textSideY)
 } ViewTextSide_Type;
 
 typedef struct
