@@ -1,5 +1,5 @@
 .vscode
 /libs/*
 /screen.bmp
-/demo
-/t31
+/demo-app
+/test-app

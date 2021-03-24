@@ -19,4 +19,4 @@ SRC += ${wildcard $(ROOT)/*.c}
 
 # 生成目标文件到上级目录
 all:
-	@$(GCC) -o $(ROOT)/../../demo $(SRC) $(INC) $(LIB) $(CFLAG)
+	@$(GCC) -o $(ROOT)/../../demo-app $(SRC) $(INC) $(LIB) $(CFLAG)

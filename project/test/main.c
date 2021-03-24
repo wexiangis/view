@@ -15,7 +15,7 @@ int main(void)
     VIEW_DELAY_INIT;
 
     //UI系统初始化(底层平台初始化)
-    viewApi_init();
+    viewApi_init(TTF_FILE);
 
     //view初始化
     vsMain = view_main_init();

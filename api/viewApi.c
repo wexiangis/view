@@ -33,7 +33,8 @@ static View_Struct viewTrash = {
 
 //--------------------  UI系统初始化 --------------------
 
-void viewApi_init(void)
+//传入字体文件ttf的路径
+void viewApi_init(char *ttfFile)
 {
     //平台初始化,获取屏幕缓存
     view_map = (View_Map *)VIEW_MAP_INIT();
@@ -45,7 +46,7 @@ void viewApi_init(void)
     //配置文件初始化
     viewConfig_init();
     //viewSrc初始化
-    viewSrc_init();
+    viewSrc_init(ttfFile);
     //viewColor初始化
     viewColor_init();
 }
@@ -134,12 +135,6 @@ struct tm *view_time(void)
 
 //--------------------- 图片内存管理 --------------------
 
-/*
- *  设置BGRA格式的图片整体透明度
- *  参数:
- *      pic: 长度为 width * height * sizeof(uint32_t) 的数据
- *      pb: 每像素字节数,检查项,必须为4
- */
 void view_set_picAlpha(uint32_t *pic, uint8_t alpha, int width, int height, int pb)
 {
     View_Point *p = (View_Point *)pic;
@@ -150,9 +145,6 @@ void view_set_picAlpha(uint32_t *pic, uint8_t alpha, int width, int height, int 
         (p++)->a = alpha;
 }
 
-/*
- *  转换RGB格式的数据为BGRA(重新分配内存)
- */
 void view_RGB_to_BGRA(uint8_t **pic, int width, int height)
 {
     uint8_t *picNew = *pic;
@@ -173,12 +165,6 @@ void view_RGB_to_BGRA(uint8_t **pic, int width, int height)
     free(picOld);
 }
 
-/*
- *  读取png、jpg、bmp数据,并转换为BGRA格式
- *  参数:
- *      pb: 返回每像素字节数,必定为4
- *  返回: BGRA格式的图片数据,NULL失败
- */
 uint32_t *view_getPic(char *picPath, int *width, int *height, int *pb)
 {
     uint8_t *ret = NULL;
@@ -308,12 +294,10 @@ void viewTrash_clean(void)
 /*
  *  功能: 画圆或圆环
  *  参数:
- *      color : 颜色
- *      xStart :
- *      yStart :
- *      rad : 半径(外经)
- *      size : 半径向里画环的圈数  0:完全填充, >0: 画环
- *  返回: 无
+ *      color: 颜色ARGB格式,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      xStart,yStart: 圆心
+ *      rad: 半径(外经)
+ *      size: 半径向里画环的圈数  0:完全填充, >0: 画环
  */
 void view_circle(
     uint32_t color,
@@ -402,17 +386,18 @@ void view_circle(
 /*
  *  功能: 画圆环,扇形,扇形圆环
  *  参数:
- *      color : 颜色
- *      xStart :
- *      yStart :
- *      rad : 半径(外经)
- *      size : 半径向里画环的圈数  0:完全填充, >0: 画环
- *      div : 把圆拆分多少分  0或1 : 画整圆, >1: 拆分多份(此时 divStart, divEnd 参数有效)
- *      divStart, divEnd : 只画 divStart ~ divEnd 的圆环
- *  返回: 无
- *  说明:
+ *      color: 颜色ARGB格式,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      xStart,yStart: 圆心
+ *      rad: 半径(外经)
+ *      size: 半径向里画环的圈数  0:完全填充, >0: 画环
+ *      div: 把圆拆分多少分  0或1: 画整圆, >1: 拆分多份(此时 divStart, divEnd 参数有效)
+ *      divStart, divEnd: 只画 divStart ~ divEnd 的圆环
  */
-void view_circleLoop(uint32_t color, int xStart, int yStart, int rad, int size, int div, int divStart, int divEnd)
+void view_circleLoop(
+    uint32_t color,
+    int xStart, int yStart,
+    int rad, int size, int div,
+    int divStart, int divEnd)
 {
     int circle_a, circle_b;
     int circle_di;
@@ -578,13 +563,14 @@ void view_circleLoop(uint32_t color, int xStart, int yStart, int rad, int size, 
 /*
  *  功能: 画点函数
  *  参数:
- *      color : 颜色
- *      xStart :
- *      yStart :
- *      size : 1~2
- *  返回: 无
+ *      color: 颜色ARGB格式,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      xStart,yStart :
+ *      size: 最小为1
  */
-void view_dot(uint32_t color, int xStart, int yStart, int size)
+void view_dot(
+    uint32_t color,
+    int xStart, int yStart,
+    int size)
 {
     if (size == 1)
         print_dot(xStart, yStart, color);
@@ -610,12 +596,16 @@ void view_dot(uint32_t color, int xStart, int yStart, int size)
 /*
  *  功能: 划线函数
  *  参数:
- *      xStart, yStart, xEnd, yEnd : 起止坐标
- *      size : 线宽
- *      space : 不为0时画的是虚线, 其值代表虚线的点密度
- *  返回: 无
+ *      color: 颜色ARGB格式,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      xStart, yStart, xEnd, yEnd: 起止坐标
+ *      size: 线宽
+ *      space: 不为0时画的是虚线, 其值代表虚线的点密度
  */
-void view_line(uint32_t color, int xStart, int yStart, int xEnd, int yEnd, int size, int space)
+void view_line(
+    uint32_t color,
+    int xStart, int yStart,
+    int xEnd, int yEnd,
+    int size, int space)
 {
     unsigned short t;
     int xerr = 0, yerr = 0;
@@ -711,12 +701,11 @@ void view_line(uint32_t color, int xStart, int yStart, int xEnd, int yEnd, int s
 /*
  *  功能: 画矩形
  *  参数:
- *      color : 颜色
- *      xStart, yStart, xEnd, yEnd : 起止坐标
- *      size : 线宽
- *      rad : 圆角半径
- *      minY, maxY : 超出上下 Y 坐标部分不绘制
- *  返回: 无
+ *      color: 颜色ARGB格式,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      xStart, yStart, xEnd, yEnd: 起止坐标
+ *      size: 线宽
+ *      rad: 圆角半径
+ *      minY, maxY: 超出上下 Y 坐标部分不绘制
  */
 void view_rectangle(
     uint32_t color,
@@ -1028,6 +1017,13 @@ void view_rectangle(
 
 /*
  *  用pic(BGRA格式)数据填充矩形
+ *  参数:
+ *      pic: BGRA排列的图片数据,字节长度要求 picWidth*picHeight*4
+ *      xStart,yStart,xEnd,yEnd: 原图输出范围
+ *      picWidth,picHeight: 图片宽高
+ *      useReplaceColor: 是否启用颜色替换
+ *      replaceColor,replaceColorBy: 寻找颜色和替换成的颜色,颜色ARGB格式,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      xMin,yMin,xMax,yMax: 输出屏幕限制范围,包含2个End所在点
  */
 void view_rectangle_padding(
     uint32_t *pic,
@@ -1117,11 +1113,11 @@ void view_rectangle_padding(
 /*
  *  功能: 画平行四边形
  *  参数:
- *      color : 颜色
- *      xStart, yStart, xEnd, yEnd : 起止坐标 //平行四边形 左上 和 右下 的坐标
- *      size : 线宽
- *      width : 平行四边形上边长度
- *      minY, maxY : 超出上下 Y 坐标部分不绘制
+ *      color: 颜色ARGB格式,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      xStart, yStart, xEnd, yEnd: 起止坐标, 平行四边形 左上 和 右下 的坐标
+ *      size: 线宽
+ *      width: 平行四边形上边长度
+ *      xMin,yMin,xMax,yMax: 输出屏幕限制范围,包含2个End所在点
  *  返回: 无
  */
 void view_parallelogram(
@@ -1256,6 +1252,11 @@ void view_parallelogram(
 
 /*
  *  根据 ttf_map 画点阵,增加范围限制和透明度参数
+ *  参数:
+ *      fColor,bColor: 写颜色和背景颜色ARGB,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      xStart,yStart: 开始写入的左上角坐标在屏幕的位置
+ *      xScreenXXX: 限制在屏幕上的输出范围,2个End的所在点也包含在内
+ *      map: 使用 ttf_getMapByUtf8 解析得到的文字矩阵信息
  */
 void view_printBitMap(
     uint32_t fColor, uint32_t bColor,
@@ -1317,12 +1318,11 @@ void view_printBitMap(
 /*
  *  功能: 字符串输出
  *  参数:
- *      fColor : 打印颜色
- *      bColor : 背景颜色,-1时使用原图填充(也就是透明)
- *      str : 字符串
- *      xStart, yStart : 矩阵的左上角定位坐标
- *      type : 字体, 例如 160, 240, 320, 400, 480, 560, 640, 前两位标识像素尺寸, 后1位表示字体
- *      space : 字符间隔, 正常输出为0
+ *      fColor,bColor: 写颜色和背景颜色ARGB格式,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      str: 字符串
+ *      xStart, yStart: 矩阵的左上角定位坐标
+ *      type: 字体, 例如 160, 240, 320, 400, 480, 560, 640, 前两位标识像素尺寸, 后1位表示字体
+ *      space: 字符间隔, 正常输出为0
  *  返回: 无
  */
 void view_string(
@@ -1353,13 +1353,12 @@ void view_string(
 /*
  *  功能: 字符串输出, 带范围限制
  *  参数:
- *      fColor : 打印颜色
- *      bColor : 背景颜色,-1时使用原图填充(也就是透明)
- *      str : 字符串
- *      xStart, yStart : 矩阵的左上角定位坐标
- *      strWidth, strHight : 相对左上角定位坐标, 限制宽, 高的矩阵内输出字符串
- *      type : 字体, 例如 160, 240, 320, 400, 480, 560, 640, 前两位标识像素尺寸, 后1位表示字体
- *      space : 字符间隔, 正常输出为0
+ *      fColor,bColor: 写颜色和背景颜色ARGB格式,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      str: 字符串
+ *      xStart, yStart: 矩阵的左上角定位坐标
+ *      strWidth, strHight: 相对左上角定位坐标, 限制宽, 高的矩阵内输出字符串
+ *      type: 字体, 例如 160, 240, 320, 400, 480, 560, 640, 前两位标识像素尺寸, 后1位表示字体
+ *      space: 字符间隔, 正常输出为0
  *  返回: 无
  */
 void view_string_rectangle(
@@ -1404,16 +1403,15 @@ void view_string_rectangle(
 /*
  *  功能: 字符串输出, 带范围限制, 自动换行
  *  参数:
- *      fColor : 打印颜色
- *      bColor : 背景颜色,-1时使用原图填充(也就是透明)
- *      str : 字符串
- *      xStart, yStart : 矩阵的左上角定位坐标
- *      strWidth, strHight : 相对左上角定位坐标, 限制宽, 高的矩阵内输出字符串
- *      type : 字体, 例如 160, 240, 320, 400, 480, 560, 640, 前两位标识像素尺寸, 后1位表示字体
- *      xSpace, ySpace : 字符间隔, 正常输出为0
- *      lineSpace : 上下行间隔
- *      retWordPerLine : 传入记录每行占用字节数的数组指针, 不用可置NULL
- *      retLine : 传入记录占用行数的指针, 不用可置NULL
+ *      fColor,bColor: 写颜色和背景颜色ARGB格式,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      str: 字符串
+ *      xStart, yStart: 矩阵的左上角定位坐标
+ *      strWidth, strHight: 相对左上角定位坐标, 限制宽, 高的矩阵内输出字符串
+ *      type: 字体, 例如 160, 240, 320, 400, 480, 560, 640, 前两位标识像素尺寸, 后1位表示字体
+ *      xSpace, ySpace: 字符间隔, 正常输出为0
+ *      lineSpace: 上下行间隔
+ *      retWordPerLine: 传入记录每行占用字节数的数组指针, 不用可置NULL
+ *      retLine: 传入记录占用行数的指针, 不用可置NULL
  * 返回: 成功输出的字符数
  */
 int view_string_rectangleLineWrap(
@@ -1529,14 +1527,13 @@ int view_string_rectangleLineWrap(
 /*
  *  功能: 字符串输出, 带范围限制, 加滚动
  *  参数:
- *      fColor : 打印颜色
- *      bColor : 背景颜色,-1时使用原图填充(也就是透明)
- *      str : 字符串
- *      xStart, yStart : 矩阵的左上角定位坐标
- *      strWidth, strHight : 相对左上角定位坐标, 限制宽, 高的矩阵内输出字符串
- *      type : 字体, 例如 160, 240, 320, 400, 480, 560, 640, 前两位标识像素尺寸, 后1位表示字体
- *      space : 字符间隔, 正常输出为0
- *      xErr : 相对 xStart 坐标, 字符串输出前先按xErr的 负/正的量 进行 左/右偏移一定像素
+ *      fColor,bColor: 写颜色和背景颜色ARGB格式,示例: 纯红0xFF0000,半透明纯红0x80FF0000
+ *      str: 字符串
+ *      xStart, yStart: 矩阵的左上角定位坐标
+ *      strWidth, strHight: 相对左上角定位坐标, 限制宽, 高的矩阵内输出字符串
+ *      type: 字体, 例如 160, 240, 320, 400, 480, 560, 640, 前两位标识像素尺寸, 后1位表示字体
+ *      space: 字符间隔, 正常输出为0
+ *      xErr: 相对 xStart 坐标, 字符串输出前先按xErr的 负/正的量 进行 左/右偏移一定像素
  * 返回: 返回此次绘制的偏差值, 以便后续无缝衔接
  */
 int view_string_rectangleCR(
@@ -1598,11 +1595,6 @@ int view_string_rectangleCR(
 
 //--------------------  链表操作 --------------------
 
-/*
- *  把 view 添加到 parentView 的子view链表
- *  参数:
- *      front: 是否添加到前面
- */
 void view_add(View_Struct *parentView, View_Struct *view, bool front)
 {
     View_Struct *vsTemp;
@@ -2177,7 +2169,7 @@ void _viewTool_viewLocal(uint32_t tickOfDraw, View_Struct *view, int width, int 
         if (width < view->absWidth)
             view->absXY[1][0] = xy[0][0] + (width + view->absWidth) / 2 - 1;
         else
-            view->absXY[1][0] = view->absXY[0][0] + width + view->absWidth - 1;
+            view->absXY[1][0] = view->absXY[0][0] + view->absWidth - 1;
     }
     //不等于自己,表示有相对对象
     else if (rView != view)
@@ -4171,7 +4163,7 @@ void view_input(
         vsTemp->textColor = ViewColor.Tips;
         vsTemp->textEdgeTop = vsTemp->textEdgeBottom = 5;
         vsTemp->textEdgeLeft = vsTemp->textEdgeRight = 5; //四周保持5的间距
-        vsTemp->textEdgeY = 6;                             //自动换行,行间距5
+        vsTemp->textEdgeY = 6;                            //自动换行,行间距5
 
 #if (MAKE_FREETYPE)
         ttf_getSizeByUtf8_multiLine(

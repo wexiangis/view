@@ -8,7 +8,7 @@
 #include "ui/viewApi.h"
 
 //源文件路径
-#define SRC_PATH "./project/t31/src"
+#define SRC_PATH "./project/test/src"
 
 //刷屏周期
 #define REFRESH_MS 500

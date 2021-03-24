@@ -21,4 +21,4 @@ SRC += ${wildcard $(ROOT)/view/*.c}
 
 # 生成目标文件到上级目录
 all:
-	@$(GCC) -o $(ROOT)/../../t31 $(SRC) $(INC) $(LIB) $(CFLAG)
+	@$(GCC) -o $(ROOT)/../../test-app $(SRC) $(INC) $(LIB) $(CFLAG)

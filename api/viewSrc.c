@@ -11,11 +11,11 @@ void viewConfig_init(void)
     viewValue_reset(&ViewConfig.device, "device", VT_INT, 1, 0);
 }
 
-void viewSrc_init(void)
+void viewSrc_init(char *ttfFile)
 {
 #if (MAKE_FREETYPE)
     //ttf字体解析句柄初始化
-    ViewTTF = ttf_init(TTF_FILE);
+    ViewTTF = ttf_init(ttfFile ? ttfFile : TTF_FILE);
 #endif
 
     //控件参数

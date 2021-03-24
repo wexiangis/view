@@ -91,6 +91,9 @@ void ttf_clean(void *obj)
     while (take != head)
         usleep(1000);
 
+    if (!ts)
+        return;
+
     //一级链表
     cType = ts->cacheType;
     while (cType)
@@ -336,6 +339,9 @@ int ttf_getMapByUtf8(void *obj, char *utf8, int type, Ttf_Map *map)
     while (take != head)
         usleep(1000);
 
+    if (!ts)
+        return -1;
+
     //utf8 转 unicode
     if ((retByte = ttf_utf8ToUnicode((uint8_t *)utf8, &unicode)) < 0)
         goto exit;
@@ -438,6 +444,9 @@ void ttf_getSizeByUtf8_multiLine(void *obj, char *utf8, int type, int xEdge, int
     take = tail++;
     while (take != head)
         usleep(1000);
+
+    if (!ts)
+        return;
 
     while (*utf8)
     {
@@ -569,6 +578,9 @@ int ttf_getSizeByUtf8(void *obj, char *utf8, int type, int xEdge, int *retH)
     take = tail++;
     while (take != head)
         usleep(1000);
+
+    if (!ts)
+        return 0;
 
     while (*utf8)
     {

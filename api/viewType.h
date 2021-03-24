@@ -245,19 +245,20 @@ typedef int (*FocusCallBack)(void *own, void *focus, int xyLimit[2][2]);
 //view->width、height参数配置
 typedef enum
 {
-    //和父控件同长, VWHT_MATCH*n-m 表示父控件的 m/n 长 // 注意: n,m < 100
+    //和父控件同长, 拓展: VWHT_MATCH*n-m 表示父控件的 m/n 长, 其中 n,m < 100
     VWHT_MATCH = -10000,
-    //和屏幕同长, VWHT_FULL*n-m 表示屏幕的 m/n 长     // 注意: n,m < 100
+    //和屏幕同长, 拓展: VWHT_FULL*n-m 表示屏幕的 m/n 长, 其中 n,m < 100
     VWHT_FULL = -1000000,
 } ViewWH_Type;
 
 //view->rNumber参数配置
 typedef enum
 {
+    //相对父控件(子链表序号从1数起)
     VRNT_PARENT = 0,
-    //相对对象为前一个, VRNT_LAST-n 表示前 n 个  // 注意: n < 100
+    //相对对象为前一个, 拓展: VRNT_LAST-n 表示前 n 个, 其中 n < 100
     VRNT_LAST = -10000,
-    //相对对象为后一个, VRNT_NEXT-n 表示后 n 个  // 注意: n < 100
+    //相对对象为后一个, 拓展: VRNT_NEXT-n 表示后 n 个, 其中 n < 100
     VRNT_NEXT = -1000000,
 } ViewWRelativeNumber_Type;
 

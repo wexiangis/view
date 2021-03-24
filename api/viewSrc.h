@@ -61,7 +61,7 @@ extern void *ViewTTF;              //公共ttf解析控制符(用来调用ttfTyp
 //配置文件初始化
 void viewConfig_init(void);
 //viewSrc初始化
-void viewSrc_init(void);
+void viewSrc_init(char *ttfFile);
 //viewColor初始化
 void viewColor_init(void);
 

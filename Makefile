@@ -22,7 +22,7 @@ endif
 ROOT = $(shell pwd)
 
 # 编译日期
-MAKE_DATE = "$(shell date +%Y-%m-%d %H:%M:%S)"
+MAKE_DATE = "$(shell date +%Y-%m-%d-%H:%M:%S)"
 
 # 源文件包含
 DIR += $(ROOT)/api
@@ -41,17 +41,17 @@ OBJ += $(foreach n,$(DIR),${patsubst %.c,$(n)/%.o,${notdir ${wildcard $(n)/*.c}}
 	@$(GCC) -c $< $(INC) $(CFLAG) $(DEF) -o $@
 
 # 在这里添加自己的工程编译跳转
-demo:
+test:
 	@cd $(ROOT)/project/$@ && \
 	make GCC=$(GCC) && \
 	cd -
-t31:
+demo:
 	@cd $(ROOT)/project/$@ && \
 	make GCC=$(GCC) && \
 	cd -
 
 clean:
-	@rm -rf demo t31
+	@rm -rf demo-app test-app
 
 cleanall: clean
 	@rm -rf $(ROOT)/libs/*

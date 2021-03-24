@@ -88,7 +88,7 @@ int main(void)
     View_Struct *myView;
 
     //UI系统初始化
-    viewApi_init();
+    viewApi_init(TTF_FILE);
     //初始化自己的视图文件
     myView = myView_init();
 

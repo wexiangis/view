@@ -4,7 +4,7 @@
 
 * make demo # 编译演示程序
 
-* ./demo # 运行演示程序,同时产生 screem.bmp 屏幕文件
+* ./demo-app # 运行演示程序,同时产生 screem.bmp 屏幕文件
 
 ## 运行环境部署
 
