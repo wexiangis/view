@@ -3,6 +3,11 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 typedef enum {
     PT_RGB = 0,
     PT_BGR,
@@ -43,5 +48,9 @@ uint8_t *png_get(char *file, int *width, int *height, int *pixelBytes, Png_Type 
 int png_create(char *file, uint8_t *argb, int width, int height, Png_Type pt);
 
 #endif // #if(MAKE_PNG)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _PNGTYPE_H_

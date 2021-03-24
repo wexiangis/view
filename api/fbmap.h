@@ -6,6 +6,11 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 typedef enum
 {
     FMT_R = 0, // 只读模式得到的mem指针绝对不能写,否则段错误
@@ -73,5 +78,9 @@ CameraMap_Struct *cameraMap_open(
  */
 void fileMap_close(FileMap_Struct *fs);
 void cameraMap_close(CameraMap_Struct *fs);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

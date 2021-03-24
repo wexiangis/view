@@ -5,6 +5,11 @@
 #ifndef _BMP_H
 #define _BMP_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /*
  *  功能: 读取bmp格式图片
  *  参数:
@@ -41,5 +46,9 @@ int bmp_create(char *filePath, unsigned char *rgb, int width, int height, int pi
  *      per: 传入, 图片每像素占用字节数
  */
 void bmp_create2(int order, char *folder, unsigned char *data, int width, int height, int per);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

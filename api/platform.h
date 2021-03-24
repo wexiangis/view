@@ -1,6 +1,11 @@
 #ifndef _PLATFORM_H_
 #define _PLATFORM_H_
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define PLAT_X_SIZE 240
 #define PLAT_Y_SIZE 240
 #define PLAT_PB 3
@@ -9,6 +14,10 @@
 void *plat_map_init(void);
 //使能输出(刷新屏幕)
 void plat_map_en(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 

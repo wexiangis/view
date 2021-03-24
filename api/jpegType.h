@@ -4,6 +4,11 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 //如果Makefile没有定义则自行定义
 #include "viewDef.h"
 #ifndef MAKE_JPEG
@@ -86,5 +91,9 @@ void jpeg_zoom(char *inFile, char *outFile, float zoom, int quality);
 void jpeg_zoom2(char *inFile, char *outFile, int quality);
 
 #endif // #if(MAKE_JPEG)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _JPEGTYPE_H_

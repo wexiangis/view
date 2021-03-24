@@ -4,6 +4,11 @@
 
 #include <time.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #include "viewPlat.h"
 #include "viewType.h"
 #include "viewSrc.h"
@@ -402,5 +407,9 @@ int view_string_rectangleCR(
     int xScreenStart, int yScreenStart,
     int xScreenEnd, int yScreenEnd,
     int type, int space, int xErr);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

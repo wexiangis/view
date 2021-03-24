@@ -1,6 +1,11 @@
 #ifndef _VIEWPLAT_H_
 #define _VIEWPLAT_H_
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 //编译时启用的宏
 #include "viewDef.h"
 
@@ -20,5 +25,9 @@
 #define VIEW_RESOLUTION (VIEW_X_SIZE > VIEW_Y_SIZE ? VIEW_Y_SIZE : VIEW_X_SIZE)
 //根据当前屏幕大小 得出推荐字号
 #define VIEW_RESOLUTION_PRINT (VIEW_RESOLUTION / 10) //字体大小
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // end of file

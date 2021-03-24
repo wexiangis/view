@@ -4,6 +4,11 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 //如果Makefile没有定义则自行定义
 #include "viewDef.h"
 #ifndef MAKE_FREETYPE
@@ -58,6 +63,10 @@ void ttf_getSizeByUtf8_multiLine(void *obj, char *utf8, int type, int xEdge, int
 int ttf_getSizeByUtf8(void *obj, char *utf8, int type, int xEdge, int *retH);
 
 #endif // #if(MAKE_FREETYPE)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _TTFTYPE_H_
 

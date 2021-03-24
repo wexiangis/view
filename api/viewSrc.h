@@ -2,6 +2,11 @@
 #ifndef _VIEWSRC_H_
 #define _VIEWSRC_H_
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #include "viewPlat.h"
 #include "viewType.h"
 #include "ttfType.h"
@@ -69,5 +74,9 @@ void viewColor_init(void);
 bool viewSrc_compare(ViewValue_Format *value);
 //检查 value 指针是否存在于 viewColor, 用于回收站决定是否释放内存
 bool viewColor_compare(ViewValue_Format *value);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

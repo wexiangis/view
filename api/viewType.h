@@ -10,6 +10,11 @@
 #include <pthread.h> //pthread_xxx
 #include <stdarg.h>  //变长参数
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 typedef struct
 {
     uint8_t b;
@@ -626,5 +631,9 @@ ViewValue_Format *viewValue_arrayRemoveByNum(ViewValue_Format *vvf, int num);
 //ViewValue_Format 的文件读/写
 int viewValue_save(char *filePath, ViewValue_Format *array, int arrayLen);
 int viewValue_load(char *filePath, ViewValue_Format *array, int arrayLen);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

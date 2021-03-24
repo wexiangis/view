@@ -1,6 +1,11 @@
 #ifndef _HIREDISTYPE_H_
 #define _HIREDISTYPE_H_
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 //如果Makefile没有定义则自行定义
 #include "viewDef.h"
 #ifndef MAKE_HIREDIS
@@ -35,6 +40,10 @@ void redis_setInt(RedisCom *rc, char *key, int value);
 void redis_setDouble(RedisCom *rc, char *key, double value);
 
 #endif // #if(MAKE_HIREDIS)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _HIREDISTYPE_H_
 
