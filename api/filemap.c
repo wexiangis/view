@@ -13,7 +13,7 @@
 #include <sys/select.h>
 #include <linux/videodev2.h>
 
-#include "fbmap.h"
+#include "filemap.h"
 
 //抛线程工具
 static void new_thread(void *obj, void *callback)
@@ -246,6 +246,45 @@ FileMap_Struct *fileMap_open(char *file, FileMap_Type type, int size)
 }
 
 /*
+ *  framebuffer设备内存获取
+ *  参数:
+ *      fbDev: fb设备,例如 /dev/fb0
+ *  返回: 指针结构体,NULL失败
+ */
+FbMap_Struct *fbMap_open(char *fbDev)
+{
+    FbMap_Struct *fms = (FbMap_Struct *)calloc(1, sizeof(FbMap_Struct));
+
+    if((fms->fd = open(fbDev, O_RDWR)) < 1)
+    {
+        fprintf(stderr, "fbMap_open: open %s failed \r\n", fbDev);
+        goto exit;
+    }
+
+    if (ioctl(fms->fd, FBIOGET_VSCREENINFO, &fms->fbInfo) < 0)
+    {
+        fprintf(stderr, "fbMap_open: ioctl FBIOGET_VSCREENINFO err \r\n");
+        goto exit;
+    }
+
+    fms->bpp = fms->fbInfo.bits_per_pixel / 8;
+    fms->bw = fms->bpp * fms->fbInfo.xres;
+    fms->bh = fms->bpp * fms->fbInfo.yres;
+    fms->size = fms->fbInfo.xres * fms->fbInfo.yres * fms->bpp;
+
+    if(!(fms->fb = (uint8_t *)mmap(0, fms->size, PROT_READ | PROT_WRITE, MAP_SHARED, fms->fd, 0)))
+    {
+        fprintf(stderr, "fbMap_open: mmap size %d err \r\n", (int)fms->size);
+        goto exit;
+    }
+
+    return fms;
+exit:
+    free(fms);
+    return NULL;
+}
+
+/*
  *  /dev/videoX设备内存映射,顺便作数据流读取回调
  *  参数:
  *      videoDev: 目标设备,示例"/dev/video0"
@@ -377,7 +416,7 @@ CameraMap_Struct *cameraMap_open(
     cms->width = fmt.fmt.pix.width;
     cms->height = fmt.fmt.pix.height;
     cms->runFlag = 1;
-    memcpy(cms->format, &fmt.fmt.pix.pixelformat, 4);
+    memcpy(cms->format, (const void *)&fmt.fmt.pix.pixelformat, 4);
     cms->memSize = reqBuff.count;
     cms->mem = (CameraMap_Frame *)calloc(reqBuff.count, sizeof(CameraMap_Frame));
     cms->obj = obj;
@@ -419,6 +458,18 @@ void fileMap_close(FileMap_Struct *fms)
     {
         if (fms->mem)
             munmap(fms->mem, fms->size);
+        if (fms->fd > 0)
+            close(fms->fd);
+        free(fms);
+    }
+}
+
+void fbMap_close(FbMap_Struct *fms)
+{
+    if (fms)
+    {
+        if (fms->fb)
+            munmap(fms->fb, fms->size);
         if (fms->fd > 0)
             close(fms->fd);
         free(fms);

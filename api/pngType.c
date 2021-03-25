@@ -8,6 +8,8 @@
 
 //读取图片时以255作为最大透明度
 #define PNG_ALPHA_MAX_BY_255_ON_READ
+//写图片时以255作为最大透明度
+#define PNG_ALPHA_MAX_BY_255_ON_WRITE
 
 static uint32_t png_types[] = {
     PNG_FORMAT_RGB,
@@ -91,6 +93,7 @@ exit:
  */
 int png_create(char *file, uint8_t *argb, int width, int height, Png_Type pt)
 {
+    int i;
     png_image image;
 
     memset(&image, 0, (sizeof image));
@@ -100,6 +103,27 @@ int png_create(char *file, uint8_t *argb, int width, int height, Png_Type pt)
     image.width = width;
     image.height = height;
     image.format = png_types[pt];
+
+#ifdef PNG_ALPHA_MAX_BY_255_ON_WRITE
+    //翻转透明度数值
+    if (pt == PT_RGBA || pt == PT_BGRA)
+    {
+        for (i = 0; i < width * height * 4;)
+        {
+            i += 3;
+            argb[i] = ~argb[i];
+            i += 1;
+        }
+    }
+    else if (pt == PT_ARGB || pt == PT_ABGR)
+    {
+        for (i = 0; i < width * height * 4;)
+        {
+            argb[i] = ~argb[i];
+            i += 4;
+        }
+    }
+#endif
 
     if (png_image_write_to_file(
             &image,

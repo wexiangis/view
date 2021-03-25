@@ -10,10 +10,11 @@ extern "C"
 #include "viewDef.h"
 
 // 平台对接
-#include "platform.h"
+#include "plat.h"
 #define VIEW_X_SIZE PLAT_X_SIZE
 #define VIEW_Y_SIZE PLAT_Y_SIZE
 #define VIEW_PB PLAT_PB
+#define VIEW_FORMAT PLAT_FORMAT
 #define VIEW_MAP_INIT() plat_map_init() //获取屏幕缓存指针
 #define VIEW_MAP_EN() plat_map_en()     //使能输出
 

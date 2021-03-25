@@ -1,3 +1,11 @@
+
+# 平台选择(即 platform 内的子文件夹)
+#   bmp: 屏幕数据输出到 screen.bmp 文件,便于界面布局调试
+#   png: 同上,只不过这是BGRA输出到 screen.png 文件
+#   fb: 输出到标准 framebuffer 设备,注意 ubuntu 要 sudo 运行
+#   其它: 自定义平台,自行往 platform 添加自己的文件夹
+PLATFORM ?= bmp
+
 # 交叉编译器选择
 # cross = arm-linux-gnueabihf
 # cross = arm-himix200-linux
@@ -25,6 +33,7 @@ ROOT = $(shell pwd)
 MAKE_DATE = "$(shell date +%Y-%m-%d-%H:%M:%S)"
 
 # 源文件包含
+DIR += $(ROOT)/platform/$(PLATFORM)
 DIR += $(ROOT)/api
 # 头文件路径 -I
 INC += -I$(ROOT)/libs/include
@@ -47,7 +56,7 @@ demo:
 	cd -
 
 clean:
-	@rm -rf demo-app test-app
+	@rm -rf demo-app
 
 cleanall: clean
 	@rm -rf $(ROOT)/libs/*
@@ -58,10 +67,14 @@ libs: libfreetype libpng libjpeg libhiredis libui
 	echo "---------- make libs complete !! ----------"
 
 libui: $(OBJ)
-	@ar r $(ROOT)/libs/lib/libui.a $(OBJ) && \
+	@rm -rf $(ROOT)/libs/lib/libui.a && \
+	rm -rf $(ROOT)/libs/include/ui && \
+	ar r $(ROOT)/libs/lib/libui.a $(OBJ) && \
 	rm -rf $(ROOT)/api/*.o && \
+	rm -rf $(ROOT)/platform/$(PLATFORM)/*.o && \
 	mkdir $(ROOT)/libs/include/ui -p && \
 	cp -rf $(ROOT)/api/*.h $(ROOT)/libs/include/ui && \
+	cp -rf $(ROOT)/platform/$(PLATFORM)/*.h $(ROOT)/libs/include/ui && \
 	sed -i '3a\#define MAKE_DATE $(MAKE_DATE)\' $(ROOT)/libs/include/ui/viewDef.h && \
 	echo "output: $(ROOT)/libs/lib/libui.a"
 

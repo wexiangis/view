@@ -1,10 +1,12 @@
 /*
  *  文件内存映射工具,创建或获取指定文件的内存块
  */
-#ifndef _FBMAP_H_
-#define _FBMAP_H_
+#ifndef _FILEMAP_H_
+#define _FILEMAP_H_
 
+#include <stdlib.h>
 #include <stdint.h>
+#include <linux/fb.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -25,6 +27,19 @@ typedef struct
     int size;
     uint8_t *mem;
 } FileMap_Struct;
+
+typedef struct
+{
+    int fd;
+    uint8_t *fb;
+    size_t size;
+    //获取屏幕宽高 fbInfo.xres fbInfo.yres
+    struct fb_var_screeninfo fbInfo;
+    //每像素字节数
+    int bpp;
+    //bytes of width, height
+    int bw, bh;
+} FbMap_Struct;
 
 typedef struct
 {
@@ -57,6 +72,14 @@ typedef struct CameraMapStruct
 FileMap_Struct *fileMap_open(char *file, FileMap_Type type, int size);
 
 /*
+ *  framebuffer设备内存获取
+ *  参数:
+ *      fbDev: fb设备,例如 /dev/fb0
+ *  返回: 指针结构体,NULL失败
+ */
+FbMap_Struct *fbMap_open(char *fbDev);
+
+/*
  *  /dev/videoX设备内存映射,顺便作数据流读取回调
  *  参数:
  *      videoDev: 目标设备,示例"/dev/video0"
@@ -76,8 +99,9 @@ CameraMap_Struct *cameraMap_open(
 /*
  *  关闭内存映射和文件
  */
-void fileMap_close(FileMap_Struct *fs);
-void cameraMap_close(CameraMap_Struct *fs);
+void fileMap_close(FileMap_Struct *fms);
+void fbMap_close(FbMap_Struct *fms);
+void cameraMap_close(CameraMap_Struct *cms);
 
 #ifdef __cplusplus
 }

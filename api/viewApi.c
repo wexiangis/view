@@ -6,7 +6,7 @@
 
 typedef union {
     uint8_t map[VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB];
-    uint8_t rgb[VIEW_Y_SIZE][VIEW_X_SIZE][VIEW_PB];
+    uint8_t grid[VIEW_Y_SIZE][VIEW_X_SIZE][VIEW_PB];
 } View_Map;
 
 //公共map指针
@@ -33,15 +33,20 @@ static View_Struct viewTrash = {
 
 //--------------------  UI系统初始化 --------------------
 
-//传入字体文件ttf的路径
-void viewApi_init(char *ttfFile)
+/*
+ *  UI系统初始化
+ *  参数:
+ *      传入字体文件ttf的路径
+ *  返回: 0成功,其它失败   
+ */
+int viewApi_init(char *ttfFile)
 {
     //平台初始化,获取屏幕缓存
     view_map = (View_Map *)VIEW_MAP_INIT();
     if (!view_map)
     {
         fprintf(stderr, "viewApi_init: VIEW_MAP_INIT failed !!\r\n");
-        exit(-1);
+        return -1;
     }
     //配置文件初始化
     viewConfig_init();
@@ -49,6 +54,7 @@ void viewApi_init(char *ttfFile)
     viewSrc_init(ttfFile);
     //viewColor初始化
     viewColor_init();
+    return 0;
 }
 
 //--------------------  基本画图接口 --------------------
@@ -63,21 +69,49 @@ void print_dot(int x, int y, uint32_t color)
     //序列化成结构体,直接忽略掉a值
     View_Point p = *((View_Point *)&color);
 
-    //完全不透明,直接拷贝
+    //无透明度
     if (!p.a)
     {
-        view_map->rgb[y][x][0] = p.r;
-        view_map->rgb[y][x][1] = p.g;
-        view_map->rgb[y][x][2] = p.b;
+#if(VIEW_FORMAT == COLOR_FORMAT_RGB || VIEW_FORMAT == COLOR_FORMAT_RGBA)
+        view_map->grid[y][x][0] = p.r;
+        view_map->grid[y][x][1] = p.g;
+        view_map->grid[y][x][2] = p.b;
+#elif(VIEW_FORMAT == COLOR_FORMAT_BGR || VIEW_FORMAT == COLOR_FORMAT_BGRA)
+        view_map->grid[y][x][0] = p.b;
+        view_map->grid[y][x][1] = p.g;
+        view_map->grid[y][x][2] = p.r;
+#elif(VIEW_FORMAT == COLOR_FORMAT_ARGB)
+        view_map->grid[y][x][1] = p.r;
+        view_map->grid[y][x][2] = p.g;
+        view_map->grid[y][x][3] = p.b;
+#elif(VIEW_FORMAT == COLOR_FORMAT_ABGR)
+        view_map->grid[y][x][1] = p.b;
+        view_map->grid[y][x][2] = p.g;
+        view_map->grid[y][x][3] = p.r;
+#endif
     }
     else if (p.a == 0xFF)
         ;
     //透明则按比例权重
     else
     {
-        view_map->rgb[y][x][0] = (uint8_t)((view_map->rgb[y][x][0] * p.a + p.r * (255 - p.a)) / 255);
-        view_map->rgb[y][x][1] = (uint8_t)((view_map->rgb[y][x][1] * p.a + p.g * (255 - p.a)) / 255);
-        view_map->rgb[y][x][2] = (uint8_t)((view_map->rgb[y][x][2] * p.a + p.b * (255 - p.a)) / 255);
+#if(VIEW_FORMAT == COLOR_FORMAT_RGB || VIEW_FORMAT == COLOR_FORMAT_RGBA)
+        view_map->grid[y][x][0] = (uint8_t)((view_map->grid[y][x][0] * p.a + p.r * (255 - p.a)) / 255);
+        view_map->grid[y][x][1] = (uint8_t)((view_map->grid[y][x][1] * p.a + p.g * (255 - p.a)) / 255);
+        view_map->grid[y][x][2] = (uint8_t)((view_map->grid[y][x][2] * p.a + p.b * (255 - p.a)) / 255);
+#elif(VIEW_FORMAT == COLOR_FORMAT_BGR || VIEW_FORMAT == COLOR_FORMAT_BGRA)
+        view_map->grid[y][x][0] = (uint8_t)((view_map->grid[y][x][0] * p.a + p.b * (255 - p.a)) / 255);
+        view_map->grid[y][x][1] = (uint8_t)((view_map->grid[y][x][1] * p.a + p.g * (255 - p.a)) / 255);
+        view_map->grid[y][x][2] = (uint8_t)((view_map->grid[y][x][2] * p.a + p.r * (255 - p.a)) / 255);
+#elif(VIEW_FORMAT == COLOR_FORMAT_ARGB)
+        view_map->grid[y][x][1] = (uint8_t)((view_map->grid[y][x][0] * p.a + p.r * (255 - p.a)) / 255);
+        view_map->grid[y][x][2] = (uint8_t)((view_map->grid[y][x][1] * p.a + p.g * (255 - p.a)) / 255);
+        view_map->grid[y][x][3] = (uint8_t)((view_map->grid[y][x][2] * p.a + p.b * (255 - p.a)) / 255);
+#elif(VIEW_FORMAT == COLOR_FORMAT_ABGR)
+        view_map->grid[y][x][1] = (uint8_t)((view_map->grid[y][x][0] * p.a + p.b * (255 - p.a)) / 255);
+        view_map->grid[y][x][2] = (uint8_t)((view_map->grid[y][x][1] * p.a + p.g * (255 - p.a)) / 255);
+        view_map->grid[y][x][3] = (uint8_t)((view_map->grid[y][x][2] * p.a + p.r * (255 - p.a)) / 255);
+#endif
     }
 }
 
@@ -88,9 +122,35 @@ void print_clean(uint32_t color)
     int i;
     for (i = 0; i < VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB;)
     {
+#if(VIEW_FORMAT == COLOR_FORMAT_RGB)
         view_map->map[i++] = p.r;
         view_map->map[i++] = p.g;
         view_map->map[i++] = p.b;
+#elif(VIEW_FORMAT == COLOR_FORMAT_BGR)
+        view_map->map[i++] = p.b;
+        view_map->map[i++] = p.g;
+        view_map->map[i++] = p.r;
+#elif(VIEW_FORMAT == COLOR_FORMAT_RGBA)
+        view_map->map[i++] = p.r;
+        view_map->map[i++] = p.g;
+        view_map->map[i++] = p.b;
+        view_map->map[i++] = p.a;
+#elif(VIEW_FORMAT == COLOR_FORMAT_BGRA)
+        view_map->map[i++] = p.b;
+        view_map->map[i++] = p.g;
+        view_map->map[i++] = p.r;
+        view_map->map[i++] = p.a;
+#elif(VIEW_FORMAT == COLOR_FORMAT_ARGB)
+        view_map->map[i++] = p.a;
+        view_map->map[i++] = p.r;
+        view_map->map[i++] = p.g;
+        view_map->map[i++] = p.b;
+#elif(VIEW_FORMAT == COLOR_FORMAT_ABGR)
+        view_map->map[i++] = p.a;
+        view_map->map[i++] = p.b;
+        view_map->map[i++] = p.g;
+        view_map->map[i++] = p.r;
+#endif
     }
 }
 
