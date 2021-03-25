@@ -208,7 +208,7 @@ View_Struct *view_init(
     int rNumber)
 {
     View_Struct *vs = (View_Struct *)calloc(1, sizeof(View_Struct));
-    strcpy(vs->name, name);
+    strcpy(vs->name, name ? name : "none");
     vs->width = width;
     vs->height = height;
     vs->rType = rType;
@@ -2647,17 +2647,18 @@ static void _view_draw(View_Struct *view, int xyLimit[2][2])
         }
         break;
     case VST_PROGRESS_BAR:
-        if (view->shapeColorPrint && view->shape.processBar.lineSize == 0)
+        //画边框线
+        if (view->shapeColorBackground && view->shape.processBar.lineSize == 0)
         {
             view_rectangle(
-                colorTemp,
+                colorTemp2,
                 view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
                 view->shape.processBar.lineSize,
                 view->shape.processBar.rad,
                 xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
         }
-        if (view->shapeColorBackground && view->shape.processBar.percent > 0)
+        if (view->shapeColorPrint && view->shape.processBar.percent > 0)
         {
             if (view->shape.processBar.edge > 0)
                 intTemp3 = view->shape.processBar.edge + view->shape.processBar.lineSize / 2 + 1;
@@ -2672,7 +2673,7 @@ static void _view_draw(View_Struct *view, int xyLimit[2][2])
             {
             case 0: //从左到右
                 view_rectangle(
-                    colorTemp2,
+                    colorTemp,
                     absXYTemp[0][0],
                     absXYTemp[0][1],
                     absXYTemp[0][0] + (absXYTemp[1][0] - absXYTemp[0][0]) * view->shape.processBar.percent / 100,
@@ -2683,7 +2684,7 @@ static void _view_draw(View_Struct *view, int xyLimit[2][2])
                 break;
             case 2: //从下到上
                 view_rectangle(
-                    colorTemp2,
+                    colorTemp,
                     absXYTemp[0][0],
                     absXYTemp[1][1] - (absXYTemp[1][1] - absXYTemp[0][1]) * view->shape.processBar.percent / 100,
                     absXYTemp[1][0],
@@ -2694,7 +2695,7 @@ static void _view_draw(View_Struct *view, int xyLimit[2][2])
                 break;
             case 1: //从右到左
                 view_rectangle(
-                    colorTemp2,
+                    colorTemp,
                     absXYTemp[1][0] - (absXYTemp[1][0] - absXYTemp[0][0]) * view->shape.processBar.percent / 100,
                     absXYTemp[0][1],
                     absXYTemp[1][0],
@@ -2705,7 +2706,7 @@ static void _view_draw(View_Struct *view, int xyLimit[2][2])
                 break;
             case 3: //从上到下
                 view_rectangle(
-                    colorTemp2,
+                    colorTemp,
                     absXYTemp[0][0],
                     absXYTemp[0][1],
                     absXYTemp[1][0],
@@ -2716,7 +2717,7 @@ static void _view_draw(View_Struct *view, int xyLimit[2][2])
                 break;
             case 4: //左右同时缩进
                 view_rectangle(
-                    colorTemp2,
+                    colorTemp,
                     absXYTemp[0][0] + (absXYTemp[1][0] - absXYTemp[0][0]) * (100 - view->shape.processBar.percent) / 100 / 2,
                     absXYTemp[0][1],
                     absXYTemp[1][0] - (absXYTemp[1][0] - absXYTemp[0][0]) * (100 - view->shape.processBar.percent) / 100 / 2,
@@ -2727,7 +2728,7 @@ static void _view_draw(View_Struct *view, int xyLimit[2][2])
                 break;
             case 5: //上下同时缩进
                 view_rectangle(
-                    colorTemp2,
+                    colorTemp,
                     absXYTemp[0][0],
                     absXYTemp[0][1] + (absXYTemp[1][1] - absXYTemp[0][1]) * (100 - view->shape.processBar.percent) / 100 / 2,
                     absXYTemp[1][0],
@@ -2738,7 +2739,7 @@ static void _view_draw(View_Struct *view, int xyLimit[2][2])
                 break;
             case 6: //上下左右同时缩进
                 view_rectangle(
-                    colorTemp2,
+                    colorTemp,
                     absXYTemp[0][0] + (absXYTemp[1][0] - absXYTemp[0][0]) * (100 - view->shape.processBar.percent) / 100 / 2,
                     absXYTemp[0][1] + (absXYTemp[1][1] - absXYTemp[0][1]) * (100 - view->shape.processBar.percent) / 100 / 2,
                     absXYTemp[1][0] - (absXYTemp[1][0] - absXYTemp[0][0]) * (100 - view->shape.processBar.percent) / 100 / 2,
@@ -2748,10 +2749,10 @@ static void _view_draw(View_Struct *view, int xyLimit[2][2])
                     xyLimit[0][0], xyLimit[0][1], xyLimit[1][0], xyLimit[1][1]);
             }
         }
-        if (view->shapeColorPrint && view->shape.processBar.lineSize > 0)
+        if (view->shapeColorBackground && view->shape.processBar.lineSize > 0)
         {
             view_rectangle(
-                colorTemp,
+                colorTemp2,
                 view->shapeAbsXY[0][0], view->shapeAbsXY[0][1],
                 view->shapeAbsXY[1][0], view->shapeAbsXY[1][1],
                 view->shape.processBar.lineSize,

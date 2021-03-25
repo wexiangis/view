@@ -4,7 +4,7 @@
 # cross = arm-himix100-linux
 # cross = mips-linux-gnu
 
-# T31平台额外配置
+# T31平台编译器额外配置
 # CFLAG += -Wl,-gc-sections -lrt -ldl
 
 # 用于依赖库编译
@@ -41,10 +41,6 @@ OBJ += $(foreach n,$(DIR),${patsubst %.c,$(n)/%.o,${notdir ${wildcard $(n)/*.c}}
 	@$(GCC) -c $< $(INC) $(CFLAG) $(DEF) -o $@
 
 # 在这里添加自己的工程编译跳转
-test:
-	@cd $(ROOT)/project/$@ && \
-	make GCC=$(GCC) && \
-	cd -
 demo:
 	@cd $(ROOT)/project/$@ && \
 	make GCC=$(GCC) && \

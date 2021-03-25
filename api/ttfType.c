@@ -56,7 +56,13 @@ typedef struct
 //主结构体初始化
 void *ttf_init(char *ttfFile)
 {
-    Ttf_Struct *ts = (Ttf_Struct *)calloc(1, sizeof(Ttf_Struct));
+    Ttf_Struct *ts;
+
+    if (!ttfFile)
+        return NULL;
+
+    ts = (Ttf_Struct *)calloc(1, sizeof(Ttf_Struct));
+
     //载入ttf字体库
     if (FT_Init_FreeType(&ts->lib) != 0)
     {

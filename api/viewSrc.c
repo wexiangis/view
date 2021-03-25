@@ -15,7 +15,7 @@ void viewSrc_init(char *ttfFile)
 {
 #if (MAKE_FREETYPE)
     //ttf字体解析句柄初始化
-    ViewTTF = ttf_init(ttfFile ? ttfFile : TTF_FILE);
+    ViewTTF = ttf_init(ttfFile);
 #endif
 
     //控件参数

@@ -16,7 +16,7 @@ extern "C"
 #endif
 
 //字体文件路径
-#define TTF_FILE "./ttf/Droid_Sans_Fallback.ttf"
+// #define TTF_FILE "./ttf/Droid_Sans_Fallback.ttf"
 
 typedef struct
 {
