@@ -55,6 +55,9 @@ demo:
 	make GCC=$(GCC) && \
 	cd -
 
+# api文件或者platform更改之后编译一次
+api: libui
+
 clean:
 	@rm -rf demo-app
 

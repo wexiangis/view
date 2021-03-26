@@ -2,6 +2,8 @@
 
 * make libs # 编译依赖库，并且编译api文件夹内文件为libui.a
 
+* make api # api文件或者platform更改之后编译一次
+
 * make demo # 编译演示程序
 
 * ./demo-app # 运行演示程序,同时产生 screem.bmp 屏幕文件
@@ -23,6 +25,6 @@
 
 * 参考 platform 内 bmp 文件夹添加自己的文件夹,后修改 Makefile 中 PLATFORM 的值为新增文件夹名称
 
-## api文件更新之后
+## api或platform文件更新之后
 
-* make libui 编译更新 libui.a 文件,而后再编译自己的工程
+* make libui 或者 make api 可以更新 libui.a 文件,而后再编译自己的工程
