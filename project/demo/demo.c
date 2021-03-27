@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include "ui/viewApi.h"
 
-#define SRC_PATH "./project/demo/src"
+#define RES_PATH "./project/demo/res"
 #define TTF_FILE "./ttf/Droid_Sans_Fallback.ttf"
 
 int myView_vStart(View_Struct *view, void *object, View_Focus *focus, ViewButtonTouch_Event *event)
@@ -57,7 +57,7 @@ View_Struct *myView_init(void)
     //本控件初始化,占用全屏
     vs = view_init("main", VWHT_FULL, VWHT_FULL, 0, 0);
     //窗口背景填充图片
-    vs->picPath = SRC_PATH "/fruits.jpg";
+    vs->picPath = RES_PATH "/fruits.jpg";
     //注册绘制前回调函数
     vs->viewStart = (ViewCallBack)&myView_vStart;
 
@@ -98,7 +98,7 @@ View_Struct *myView_init(void)
     vsTemp->shape.rect.rad = 20; //圆角半径20像素
     vsTemp->shapeColorPrint = 0xB000FFFF;
     //指定图片,会自动缩放为当前控件大小
-    vsTemp->picPath = SRC_PATH "/signal.png";
+    vsTemp->picPath = RES_PATH "/signal.png";
     //添加到父控件链表
     view_add(vs, vsTemp, false);
 

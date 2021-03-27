@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "hiredisType.h"
 
+#include "hiredisType.h"
 #if(MAKE_HIREDIS)
-#include "hiredis.h"
+#include "hiredis/hiredis.h"
 
 RedisCom* redis_connect(char *ip, int port)
 {

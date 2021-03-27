@@ -38,7 +38,6 @@ DIR += $(ROOT)/api
 # 头文件路径 -I
 INC += -I$(ROOT)/libs/include
 INC += -I$(ROOT)/libs/include/freetype2
-INC += -I$(ROOT)/libs/include/hiredis
 INC += $(foreach n,$(DIR),-I$(n))
 # 其它编译参数
 CFLAG += -Wall -lm -lpthread -lfreetype -ljpeg -lz -lpng -lhiredis
