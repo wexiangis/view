@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include "ui/viewApi.h"
 
+//资源文件夹
 #define RES_PATH "./project/demo/res"
-#define TTF_FILE "./ttf/Droid_Sans_Fallback.ttf"
+//ttf文件在资源文件夹内
+#define TTF_FILE RES_PATH"/Droid_Sans_Fallback.ttf"
 
 int myView_vStart(View_Struct *view, void *object, View_Focus *focus, ViewButtonTouch_Event *event)
 {
