@@ -1,3 +1,6 @@
+/*
+ *  hiredis对接文件,依赖 libhiredis
+ */
 #ifndef _HIREDISTYPE_H_
 #define _HIREDISTYPE_H_
 
@@ -6,13 +9,6 @@ extern "C"
 {
 #endif
 
-//如果Makefile没有定义则自行定义
-#include "viewDef.h"
-#ifndef MAKE_HIREDIS
-#define MAKE_HIREDIS 1
-#endif
-
-#if(MAKE_HIREDIS)
 #include <pthread.h>
 
 typedef struct{
@@ -38,8 +34,6 @@ void redis_setStr(RedisCom *rc, char *key, char *value);
 void redis_setInt(RedisCom *rc, char *key, int value);
 
 void redis_setDouble(RedisCom *rc, char *key, double value);
-
-#endif // #if(MAKE_HIREDIS)
 
 #ifdef __cplusplus
 }

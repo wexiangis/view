@@ -1,3 +1,6 @@
+/*
+ *  png文件解析,依赖 libpng
+ */
 #ifndef _PNGTYPE_H_
 #define _PNGTYPE_H_
 
@@ -16,14 +19,6 @@ typedef enum {
     PT_ARGB,
     PT_ABGR,
 } Png_Type;
-
-//如果Makefile没有定义则自行定义
-#include "viewDef.h"
-#ifndef MAKE_PNG
-#define MAKE_PNG 1
-#endif
-
-#if (MAKE_PNG)
 
 /*
  *  png 图片数据获取
@@ -46,8 +41,6 @@ uint8_t *png_get(char *file, int *width, int *height, int *pixelBytes, Png_Type 
  *  返回: 0成功 -1失败
  */
 int png_create(char *file, uint8_t *argb, int width, int height, Png_Type pt);
-
-#endif // #if(MAKE_PNG)
 
 #ifdef __cplusplus
 }

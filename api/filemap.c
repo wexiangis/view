@@ -1,3 +1,7 @@
+/*
+ *  文件内存映射工具,创建或获取指定文件的内存块
+ *  支持文件、framebuffer、video设备的映射
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

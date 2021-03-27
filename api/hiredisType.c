@@ -1,9 +1,11 @@
+/*
+ *  hiredis对接文件,依赖 libhiredis
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "hiredisType.h"
-#if(MAKE_HIREDIS)
 #include "hiredis/hiredis.h"
 
 RedisCom* redis_connect(char *ip, int port)
@@ -163,5 +165,3 @@ void redis_setDouble(RedisCom *rc, char *key, double value)
 
     pthread_mutex_unlock(&rc->lock);
 }
-
-#endif // #if(MAKE_HIREDIS)

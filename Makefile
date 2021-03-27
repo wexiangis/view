@@ -29,9 +29,6 @@ endif
 # 根目录获取
 ROOT = $(shell pwd)
 
-# 编译日期
-MAKE_DATE = "$(shell date +%Y-%m-%d-%H:%M:%S)"
-
 # 源文件包含
 DIR += $(ROOT)/platform/$(PLATFORM)
 DIR += $(ROOT)/api
@@ -77,7 +74,6 @@ libui: $(OBJ)
 	mkdir $(ROOT)/libs/include/ui -p && \
 	cp -rf $(ROOT)/api/*.h $(ROOT)/libs/include/ui && \
 	cp -rf $(ROOT)/platform/$(PLATFORM)/*.h $(ROOT)/libs/include/ui && \
-	sed -i '3a\#define MAKE_DATE $(MAKE_DATE)\' $(ROOT)/libs/include/ui/viewDef.h && \
 	echo "output: $(ROOT)/libs/lib/libui.a"
 
 # 用于辅助生成动态库的工具

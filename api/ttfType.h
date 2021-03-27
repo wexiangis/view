@@ -1,4 +1,7 @@
-
+/*
+ *  ttf文件解析,依赖 libfreetype
+ *  注意库的头文件需包含到 -I../include/freetype2
+ */
 #ifndef _TTFTYPE_H_
 #define _TTFTYPE_H_
 
@@ -9,15 +12,6 @@ extern "C"
 {
 #endif
 
-//如果Makefile没有定义则自行定义
-#include "viewDef.h"
-#ifndef MAKE_FREETYPE
-#define MAKE_FREETYPE 1
-#endif
-
-//字体文件路径
-// #define TTF_FILE "./ttf/Droid_Sans_Fallback.ttf"
-
 typedef struct
 {
     int width, height;       //目标输出点阵宽高(bitMap点阵就包含在内)
@@ -26,8 +20,6 @@ typedef struct
     int lineByte;            //bitMap每行可用字节数(会有盈余,比如 bitWidth=6,而 lineByte 会给2字节)
     uint8_t *bitMap;   //实际有效点阵数组,字节数为 bitHeight * lineByte
 } Ttf_Map;
-
-#if(MAKE_FREETYPE)
 
 //主结构体初始化
 void *ttf_init(char *ttfFile);
@@ -61,8 +53,6 @@ void ttf_getSizeByUtf8_multiLine(void *obj, char *utf8, int type, int xEdge, int
 
 //单行模式
 int ttf_getSizeByUtf8(void *obj, char *utf8, int type, int xEdge, int *retH);
-
-#endif // #if(MAKE_FREETYPE)
 
 #ifdef __cplusplus
 }
@@ -139,7 +129,7 @@ int main(void)
     int i, ret;
     char str[] = "123_abc-ABC 上下!";
     Ttf_Map map;
-    void *obj = ttf_init(TTF_FILE);
+    void *obj = ttf_init("./xxx.ttf");
 
     for(i = 0; i < strlen(str);)
     {

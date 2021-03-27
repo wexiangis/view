@@ -1,9 +1,11 @@
+/*
+ *  png文件解析,依赖 libpng
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "pngType.h"
 
-#if (MAKE_PNG)
+#include "pngType.h"
 #include "libpng16/png.h"
 
 //读取图片时以255作为最大透明度
@@ -136,5 +138,3 @@ int png_create(char *file, uint8_t *argb, int width, int height, Png_Type pt)
 
     return -1;
 }
-
-#endif // #if(MAKE_PNG)

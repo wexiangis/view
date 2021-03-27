@@ -6,9 +6,6 @@ extern "C"
 {
 #endif
 
-//编译时启用的宏
-#include "viewDef.h"
-
 // 平台对接
 #include "plat.h"
 #define VIEW_X_SIZE PLAT_X_SIZE

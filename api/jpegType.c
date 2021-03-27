@@ -1,9 +1,10 @@
-
+/*
+ *  jpeg文件解析,依赖 libjpeg
+ */
 #include <stdio.h>
 #include <stdlib.h>
-#include "jpegType.h"
 
-#if(MAKE_JPEG)
+#include "jpegType.h"
 #include "jpeglib.h"
 
 typedef struct
@@ -675,5 +676,3 @@ end:
     fclose(jpOut.fp);
     fclose(jpIn.fp);
 }
-
-#endif // #if(MAKE_JPEG)

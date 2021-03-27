@@ -1,4 +1,6 @@
-
+/*
+ *  jpeg文件解析,依赖 libjpeg
+ */
 #ifndef _JPEGTYPE_H_
 #define _JPEGTYPE_H_
 
@@ -8,14 +10,6 @@
 extern "C"
 {
 #endif
-
-//如果Makefile没有定义则自行定义
-#include "viewDef.h"
-#ifndef MAKE_JPEG
-#define MAKE_JPEG 1
-#endif
-
-#if(MAKE_JPEG)
 
 // -------------------------- 文件数据整读整写模式 --------------------------
 
@@ -86,11 +80,6 @@ void jpeg_closeLine(void *obj);
  *      quality: 输出图片质量,1~100,越大越好,文件越大
  */
 void jpeg_zoom(char *inFile, char *outFile, float zoom, int quality);
-
-//固定放大2.5倍,且要求输入图像宽高为5的整数倍
-void jpeg_zoom2(char *inFile, char *outFile, int quality);
-
-#endif // #if(MAKE_JPEG)
 
 #ifdef __cplusplus
 }

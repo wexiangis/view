@@ -1,10 +1,11 @@
-
+/*
+ *  ttf文件解析,依赖 libfreetype
+ *  注意库的头文件需包含到 -I../include/freetype2
+ */
 #include <stdio.h>
 #include <unistd.h>
 
 #include "ttfType.h"
-
-#if(MAKE_FREETYPE)
 
 #include "ft2build.h"
 #include FT_FREETYPE_H
@@ -666,5 +667,3 @@ exit:
     head += 1;
     return retWidth;
 }
-
-#endif // #if(MAKE_FREETYPE)

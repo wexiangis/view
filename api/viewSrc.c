@@ -13,10 +13,8 @@ void viewConfig_init(void)
 
 void viewSrc_init(char *ttfFile)
 {
-#if (MAKE_FREETYPE)
     //ttf字体解析句柄初始化
     ViewTTF = ttf_init(ttfFile);
-#endif
 
     //控件参数
     viewValue_reset(&ViewSrc.Shape_Rad, "Shape_Rad", VT_INT, 1, VIEW_RESOLUTION / 24);

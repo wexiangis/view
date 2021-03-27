@@ -1,5 +1,6 @@
 /*
  *  文件内存映射工具,创建或获取指定文件的内存块
+ *  支持文件、framebuffer、video设备的映射
  */
 #ifndef _FILEMAP_H_
 #define _FILEMAP_H_

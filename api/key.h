@@ -10,6 +10,11 @@
  */
 #define INPUT_DEV_PATH "/dev/input/event1"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /*
  *  按键回调注册
  *  参数:
@@ -23,5 +28,9 @@
  *  返回: 0/成功 -1/失败,找不到设备或者没有sudo运行
  */
 int key_register(char *devPath, void *obj, void (*callback)(void *, int, int));
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

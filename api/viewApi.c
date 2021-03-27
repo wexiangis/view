@@ -230,21 +230,17 @@ uint32_t *view_getPic(char *picPath, int *width, int *height, int *pb)
     uint8_t *ret = NULL;
 
     //png 格式直接转换BGRA,不需后处理
-#if (MAKE_PNG)
     if (strstr(picPath, ".png") || strstr(picPath, ".PNG"))
     {
         ret = png_get(picPath, width, height, pb, PT_BGRA);
         if (ret)
             return (uint32_t *)ret;
     }
-#endif
-
     //jpeg 和 bmp 读取数据默认为RGB格式,需转为BGRA格式
-#if (MAKE_PNG)
-    if (strstr(picPath, ".jpg") || strstr(picPath, ".JPG") ||
+    else if (strstr(picPath, ".jpg") || strstr(picPath, ".JPG") ||
         strstr(picPath, ".jpeg") || strstr(picPath, ".JPEG"))
         ret = jpeg_get(picPath, width, height, pb);
-#endif
+
     if (!ret)
         ret = bmp_get(picPath, width, height, pb);
 
@@ -1391,7 +1387,6 @@ void view_string(
     int xStart, int yStart,
     int type, int space)
 {
-#if (MAKE_FREETYPE)
     int ret;
     Ttf_Map map;
 
@@ -1407,7 +1402,6 @@ void view_string(
             str += ret;
         }
     }
-#endif
 }
 
 /*
@@ -1430,7 +1424,6 @@ void view_string_rectangle(
     int xScreenEnd, int yScreenEnd,
     int type, int space)
 {
-#if (MAKE_FREETYPE)
     int ret;
     Ttf_Map map;
 
@@ -1457,7 +1450,6 @@ void view_string_rectangle(
             str += ret;
         }
     }
-#endif
 }
 
 /*
@@ -1486,7 +1478,6 @@ int view_string_rectangleLineWrap(
     int *retWordPerLine,
     int *retLine)
 {
-#if (MAKE_FREETYPE)
     int ret;
     int xC = xStart, yC = yStart;
     int xE = xStart + strWidth, yE = yStart + strHight;
@@ -1579,9 +1570,6 @@ int view_string_rectangleLineWrap(
         *rwpl = str - strOld;
 
     return (str - strStart);
-#else
-    return strlen(str);
-#endif
 }
 
 /*
@@ -1606,7 +1594,6 @@ int view_string_rectangleCR(
     int type, int space,
     int xErr)
 {
-#if (MAKE_FREETYPE)
     int xMov = xErr, typeHeight = type / 10;
     int ret;
     int strCount = 0, retVal = xErr;
@@ -1648,9 +1635,6 @@ int view_string_rectangleCR(
         }
     }
     return retVal;
-#else
-    return strlen(str) * type / 10;
-#endif
 }
 
 //--------------------  链表操作 --------------------
@@ -2981,7 +2965,6 @@ static void _view_draw(View_Struct *view, int xyLimit[2][2])
 
         if (view->textOutput)
         {
-#if (MAKE_FREETYPE)
             //----- 输出方式一: 自动换行输出 -----
             if (view->textEdgeY > 0)
             {
@@ -3095,7 +3078,6 @@ static void _view_draw(View_Struct *view, int xyLimit[2][2])
                         view->textSize, view->textEdgeX);
                 }
             }
-#endif
         }
     }
 
@@ -4228,7 +4210,6 @@ void view_input(
         vsTemp->textEdgeLeft = vsTemp->textEdgeRight = 5; //四周保持5的间距
         vsTemp->textEdgeY = 6;                            //自动换行,行间距5
 
-#if (MAKE_FREETYPE)
         ttf_getSizeByUtf8_multiLine(
             ViewTTF,
             label,
@@ -4258,12 +4239,6 @@ void view_input(
                 vsTemp->textSize = 160;
             }
         }
-#else
-        vsTemp->textEdgeTop = vsTemp->textEdgeBottom = 3;
-        vsTemp->textEdgeLeft = vsTemp->textEdgeRight = 3; //四周保持5的间距
-        vsTemp->textEdgeY = 4;
-        vsTemp->textSize = 200;
-#endif
 
         vsTemp->callBack = (ViewCallBack)&_input_comm_callBack;
         vsTemp->enMoveEvent = true;
@@ -4748,7 +4723,6 @@ void view_input(
 int view_getType(char *text, int width, int xEdge)
 {
     int retValueType = 240;
-#if (MAKE_FREETYPE)
     int retWidth;
     retValueType = 480;
     retWidth = ttf_getSizeByUtf8(ViewTTF, text, 480, xEdge, NULL);
@@ -4766,6 +4740,5 @@ int view_getType(char *text, int width, int xEdge)
             }
         }
     }
-#endif
     return retValueType;
 }
