@@ -27,6 +27,7 @@ typedef enum {
  *      width: 返回图片宽(像素), 不接收置NULL
  *      height: 返回图片高(像素), 不接收置NULL
  *      pixelBytes: 返回图片每像素的字节数, 不接收置NULL
+ *      pt: 设置输出格式
  *  返回: argb图片数据指针,不透明~完全透明 !! 用完记得free()释放 !!
  */
 uint8_t *png_get(char *file, int *width, int *height, int *pixelBytes, Png_Type pt);
@@ -38,6 +39,7 @@ uint8_t *png_get(char *file, int *width, int *height, int *pixelBytes, Png_Type 
  *      argb: 原始数据,根据pixelBytes值决定是否有a值
  *      width: 宽(像素)
  *      height: 高(像素)
+ *      pt: argb数据格式
  *  返回: 0成功 -1失败
  */
 int png_create(char *file, uint8_t *argb, int width, int height, Png_Type pt);

@@ -44,14 +44,14 @@ int jpeg_create(char *outFile, uint8_t *rgb, int width, int height, int pixelByt
  *  参数: 同上
  *  返回: 行处理指针,NULL失败
  */
-void *objeg_getLine(char *inFile, int *width, int *height, int *pixelBytes);
+void *jpeg_getLine(char *inFile, int *width, int *height, int *pixelBytes);
 
 /*
  *  行处理模式
  *  参数: 同上
  *  返回: 行处理指针,NULL失败
  */
-void *objeg_createLine(char *outFile, int width, int height, int pixelBytes, int quality);
+void *jpeg_createLine(char *outFile, int width, int height, int pixelBytes, int quality);
 
 /*
  *  按行rgb数据读、写
