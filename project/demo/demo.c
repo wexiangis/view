@@ -1,6 +1,6 @@
 
 #include <stdio.h>
-#include "ui/viewApi.h"
+#include "ui/viewapi.h"
 
 //资源文件夹
 #define RES_PATH "./project/demo/res"

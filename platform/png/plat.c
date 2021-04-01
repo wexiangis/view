@@ -2,7 +2,7 @@
 #include <string.h>
 
 #include "plat.h"
-#include "pngType.h" //在 api 文件夹内有该文件
+#include "pngtype.h" //在 api 文件夹内有该文件
 
 #define PLAT_OUTPUT_PNG "./screen.png"
 

@@ -7,9 +7,9 @@ extern "C"
 {
 #endif
 
-#include "viewPlat.h"
-#include "viewType.h"
-#include "ttfType.h"
+#include "viewplat.h"
+#include "viewtype.h"
+#include "ttftype.h"
 
 //全局开放的词条
 typedef struct ViewSrcType

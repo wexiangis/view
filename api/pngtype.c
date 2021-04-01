@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "pngType.h"
+#include "pngtype.h"
 #include "libpng16/png.h"
 
 //读取图片时以255作为最大透明度

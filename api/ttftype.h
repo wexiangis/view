@@ -65,12 +65,12 @@ int ttf_getSizeByUtf8(void *obj, char *utf8, int type, int xEdge, int *retH);
 #include <stdio.h>
 #include <string.h>
 
-#include "ttfType.h"
+#include "ttftype.h"
 
 void draw(Ttf_Map map)
 {
     //总字节
-    int byteTotal = map.height * map.lineByte;
+    int byteTotal = map.bitHeight * map.lineByte;
     //总字节计数
     int byteTotalCount;
     //一行字节计数

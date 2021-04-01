@@ -2,7 +2,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "viewApi.h"
+#include "viewapi.h"
 
 typedef union {
     uint8_t map[VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB];
@@ -174,16 +174,16 @@ void view_delayms(uint32_t ms)
     view_delayus(ms * 1000);
 }
 
-long view_tickUs(void)
+uint32_t view_tickUs(void)
 {
     struct timeval tv = {0};
     gettimeofday(&tv, NULL);
-    return (long)(tv.tv_sec * 1000000 + tv.tv_usec);
+    return (uint32_t)(tv.tv_sec * 1000000 + tv.tv_usec);
 }
 
-int view_tickMs(void)
+uint32_t view_tickMs(void)
 {
-    return (int)(view_tickUs() / 1000);
+    return view_tickUs() / 1000;
 }
 
 struct tm *view_time(void)
@@ -1322,7 +1322,7 @@ void view_printBitMap(
     Ttf_Map map)
 {
     //总字节
-    int byteTotal = map.height * map.lineByte;
+    int byteTotal = map.bitHeight * map.lineByte;
     //总字节计数
     int byteTotalCount;
     //一行字节计数

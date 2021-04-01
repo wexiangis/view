@@ -9,14 +9,14 @@ extern "C"
 {
 #endif
 
-#include "viewPlat.h"
-#include "viewType.h"
-#include "viewSrc.h"
+#include "viewplat.h"
+#include "viewtype.h"
+#include "viewsrc.h"
 
 #include "bmp.h"      //图片解析
-#include "jpegType.h" //图片解析
-#include "pngType.h"  //图片解析
-#include "ttfType.h"  //矢量字体解析
+#include "jpegtype.h" //图片解析
+#include "pngtype.h"  //图片解析
+#include "ttftype.h"  //矢量字体解析
 
 //--------------------  UI系统初始化 --------------------
 
@@ -42,12 +42,12 @@ void print_en(void);
 void view_delayus(uint32_t us);
 void view_delayms(uint32_t ms);
 
-long view_tickUs(void);
-int view_tickMs(void);
+uint32_t view_tickUs(void);
+uint32_t view_tickMs(void);
 
 // 周期延时初始化
 #define VIEW_DELAY_INIT \
-    long _tick1 = 0, _tick2;
+    uint32_t _tick1 = 0, _tick2;
 
 // 周期延时,按时差变化动态延时
 #define VIEW_DELAY_US(us)                        \
@@ -195,6 +195,27 @@ void view_input(
     bool callBackNext,
     View_Struct *callBackNextView,
     int astrict);
+
+//----------------------- 弹窗封装 -------------------
+
+/*
+ *  清除提示弹窗
+ *  参数:
+ *      window: 目标窗口
+ *      msg: 检索内容,为NULL时通配
+ *      color: 检索文字颜色,为0时通配
+ */
+void view_tips_clean(View_Struct *window, char *msg, uint32_t color);
+
+/*
+ *  添加提示弹窗
+ *  参数:
+ *      window: 目标窗口
+ *      msg: 内容
+ *      color: 文字颜色
+ *      delayms: 滞留时长
+ */
+void view_tips_add(View_Struct *window, char *msg, uint32_t color, uint32_t delayms);
 
 //-------------- 根据内容和限制宽度,获取可能的最大字体 ----------
 

@@ -1,5 +1,5 @@
 
-#include "viewSrc.h"
+#include "viewsrc.h"
 
 ViewConfig_Type ViewConfig;
 ViewSrc_Type ViewSrc;

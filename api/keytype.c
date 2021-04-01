@@ -9,7 +9,7 @@
 #include <sys/types.h>
 #include <linux/input.h>
 
-#include "key.h"
+#include "keytype.h"
 
 //支持最大同按下的按键数量
 #define KEY_COMBINATION 10

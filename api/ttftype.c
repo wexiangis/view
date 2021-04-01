@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "ttfType.h"
+#include "ttftype.h"
 
 #include "ft2build.h"
 #include FT_FREETYPE_H

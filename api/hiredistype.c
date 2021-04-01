@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hiredisType.h"
+#include "hiredistype.h"
 #include "hiredis/hiredis.h"
 
 RedisCom* redis_connect(char *ip, int port)
