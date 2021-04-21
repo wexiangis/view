@@ -15,13 +15,24 @@ extern "C"
 {
 #endif
 
+//颜色排列方式(不要改动)
+typedef enum
+{
+    VIEW_COLOR_FORMAT_RGB = 0,
+    VIEW_COLOR_FORMAT_BGR,
+    VIEW_COLOR_FORMAT_RGBA,
+    VIEW_COLOR_FORMAT_BGRA,
+    VIEW_COLOR_FORMAT_ARGB,
+    VIEW_COLOR_FORMAT_ABGR,
+} VIEW_COLOR_FORMAT;
+
 typedef struct
 {
     uint8_t b;
     uint8_t g;
     uint8_t r;
     uint8_t a;
-} View_Point;
+} View_PointARGB;
 
 //========== 数据类型代号 ==========
 typedef enum

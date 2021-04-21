@@ -1,4 +1,3 @@
-
 #ifndef _VIEWAPI_H_
 #define _VIEWAPI_H_
 
@@ -9,7 +8,6 @@ extern "C"
 {
 #endif
 
-#include "viewplat.h"
 #include "viewtype.h"
 #include "viewsrc.h"
 
@@ -28,14 +26,21 @@ extern "C"
  */
 int viewApi_init(char *ttfFile);
 
+//--------------------  屏幕基本信息 --------------------
+
+uint32_t view_width(void);
+uint32_t view_height(void);
+uint32_t view_pixel_bytes(void); //每像素字节数
+VIEW_COLOR_FORMAT view_color_format(void); //像素排列
+
 //--------------------  基本画图接口 --------------------
 
 //画点
-void print_dot(int x, int y, uint32_t color);
+void view_print(int x, int y, uint32_t color);
 //用rgb颜色清屏
-void print_clean(uint32_t color);
+void view_clear(uint32_t color);
 //使能输出
-void print_en(void);
+void view_enable(void);
 
 //--------------------- 延时和时间 --------------------
 
@@ -62,8 +67,8 @@ struct tm *view_time(void);
 //--------------------- 颜色和图片 --------------------
 
 //颜色透明度快速配置(alpha,0~255,越大越透明)
-#define view_set_alpha(color, alpha) (((View_Point *)&color)->a = alpha & 0xFF)
-#define view_get_alpha(color) ((View_Point *)&color)->a
+#define view_set_alpha(color, alpha) (((View_PointARGB *)&color)->a = alpha & 0xFF)
+#define view_get_alpha(color) ((View_PointARGB *)&color)->a
 
 /*
  *  图片透明图设置

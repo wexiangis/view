@@ -73,7 +73,7 @@ void view_tips_add(View_Struct *window, char *msg, uint32_t color, uint32_t dela
     vs->textColor = color;
     vs->textEdgeX = 1;
     vs->textEdgeY = 1;
-    vs->textSize = ViewSrc.Content_Type.value.Int * 10;
+    vs->textSize = ViewSrc.Content_Type.value.Int;
     //目标时间,到达这个时间则关闭窗口
     vs->textBakup = viewValue_init(NULL, VT_INT, 1, view_tickMs() + delayms);
     //绘制前回调

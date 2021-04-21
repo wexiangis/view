@@ -6,36 +6,35 @@ extern "C"
 {
 #endif
 
-//颜色排列方式
-#define COLOR_FORMAT_RGB 0
-#define COLOR_FORMAT_BGR 1
-#define COLOR_FORMAT_RGBA 2
-#define COLOR_FORMAT_BGRA 3
-#define COLOR_FORMAT_ARGB 4
-#define COLOR_FORMAT_ABGR 5
-
-//颜色排列方式
-#define PLAT_FORMAT COLOR_FORMAT_RGB
-//屏幕宽高
-#define PLAT_X_SIZE 240
-#define PLAT_Y_SIZE 240
-//每像素字节数
-#define PLAT_PB 3
+//颜色排列方式(不要改动)
+typedef enum
+{
+    PLAT_COLOR_FORMAT_RGB = 0,
+    PLAT_COLOR_FORMAT_BGR,
+    PLAT_COLOR_FORMAT_RGBA,
+    PLAT_COLOR_FORMAT_BGRA,
+    PLAT_COLOR_FORMAT_ARGB,
+    PLAT_COLOR_FORMAT_ABGR,
+} PLAT_COLOR_FORMAT;
 
 /*
  *  平台初始化
- *  返回: FB_X_SIZE * FB_Y_SIZE * FB_PB 的内存
+ *  参数: 获得屏幕宽、高、每像素字节数、颜色排列模式(如上定义)
+ *  返回: width * height * pb 的内存
  */
-void *plat_map_init(void);
+void *plat_init(
+    int *width,
+    int *height,
+    int *pb,
+    PLAT_COLOR_FORMAT *format);
 
 /*
  *  使能输出(刷新屏幕)
  */
-void plat_map_en(void);
+void plat_enable(void);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-

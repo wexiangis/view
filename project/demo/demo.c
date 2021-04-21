@@ -104,8 +104,8 @@ View_Struct *myView_init(void)
     //添加到父控件链表
     view_add(vs, vsTemp, false);
 
-    //控件4: 进度条, 在父控件的底部,横向占满,高24
-    vsTemp = view_init(NULL, VWHT_MATCH, 24, VRT_BOTTOM, 0);
+    //控件4: 进度条, 在父控件的底部,横向占满,高1/10屏幕高
+    vsTemp = view_init(NULL, VWHT_MATCH, VWHT_MATCH * 10, VRT_BOTTOM, 0);
     //进度条参数
     vsTemp->shapeType = VST_PROGRESS_BAR;
     vsTemp->shape.processBar.rad = 6;        //圆角半径6
@@ -149,11 +149,11 @@ int main(void)
     while (1)
     {
         //清屏(白底色)
-        print_clean(0xFFFFFF);
+        view_clear(0xFFFFFF);
         //画界面
         view_draw(NULL, myView);
         //使能输出
-        print_en();
+        view_enable();
         //一帧延时
         view_delayms(200);
     }

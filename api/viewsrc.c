@@ -6,20 +6,28 @@ ViewSrc_Type ViewSrc;
 ViewColor_Type ViewColor;
 void *ViewTTF;
 
-void viewConfig_init(void)
+void viewConfig_init(int width, int height)
 {
     viewValue_reset(&ViewConfig.device, "device", VT_INT, 1, 0);
 }
 
-void viewSrc_init(char *ttfFile)
+void viewSrc_init(int width, int height, char *ttfFile)
 {
+    //参考分辨率
+    int pixel = width > height ? width : height;
+    //设置为字号*10大小,如分辨率为240x240,则type=240
+    if (pixel < 10)
+        pixel *= 10;
+    else
+        pixel = pixel / 10 * 10;
+
     //ttf字体解析句柄初始化
     ViewTTF = ttf_init(ttfFile);
 
     //控件参数
-    viewValue_reset(&ViewSrc.Shape_Rad, "Shape_Rad", VT_INT, 1, VIEW_RESOLUTION / 24);
-    viewValue_reset(&ViewSrc.Content_Type, "Content_Type", VT_INT, 1, VIEW_RESOLUTION_PRINT);
-    viewValue_reset(&ViewSrc.Label_Size, "Label_Size", VT_INT, 1, VIEW_RESOLUTION_PRINT * 3 / 4);
+    viewValue_reset(&ViewSrc.Shape_Rad, "Shape_Rad", VT_INT, 1, pixel / 10 / 2);
+    viewValue_reset(&ViewSrc.Content_Type, "Content_Type", VT_INT, 1, pixel);
+    viewValue_reset(&ViewSrc.Label_Size, "Label_Size", VT_INT, 1, pixel * 3 / 4);
     printf("ViewSrc print type : label/%d content/%d rad/%d\n",
            ViewSrc.Label_Size.value.Int,
            ViewSrc.Content_Type.value.Int,

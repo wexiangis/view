@@ -1,25 +1,34 @@
-
 #include <sys/time.h>
 #include <unistd.h>
 
+#include "plat.h"
 #include "viewapi.h"
 
-typedef union {
-    uint8_t map[VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB];
-    uint8_t grid[VIEW_Y_SIZE][VIEW_X_SIZE][VIEW_PB];
-} View_Map;
+//--------------------  本地静态数据 --------------------
 
-//公共map指针
-static View_Map *view_map = NULL;
+//基本信息
+static int VIEW_X_SIZE = 240;
+static int VIEW_Y_SIZE = 240;
+static int VIEW_X_END = 239;
+static int VIEW_Y_END = 239;
+static int VIEW_PB = 3;
+static VIEW_COLOR_FORMAT VIEW_COLOR_FT = VIEW_COLOR_FORMAT_RGB;
+
+//数据缓冲
+static uint8_t *view_map = NULL;
+
+//不同颜色排列下的画图接口
+static void (*_view_print)(int, int, uint32_t) = NULL;
+static void (*_view_clear)(uint32_t) = NULL;
 
 //公共顶view
-static View_Struct ViewCommonParent = {
-    .name = "commonParent",
-    .width = VIEW_X_SIZE,
-    .height = VIEW_Y_SIZE,
-    .absWidth = VIEW_X_SIZE,
-    .absHeight = VIEW_Y_SIZE,
-    .absXY = {{0, 0}, {VIEW_X_END, VIEW_Y_END}},
+static View_Struct vsCommParent = {
+    .name = "vsCommParent",
+    .width = 240,
+    .height = 240,
+    .absWidth = 240,
+    .absHeight = 240,
+    .absXY = {{0, 0}, {239, 239}},
     .tickOfDraw = 1,
 };
 
@@ -33,6 +42,17 @@ static View_Struct viewTrash = {
 
 //--------------------  UI系统初始化 --------------------
 
+static void view_print_RGB(int x, int y, uint32_t color);
+static void view_print_BGR(int x, int y, uint32_t color);
+static void view_print_ARGB(int x, int y, uint32_t color);
+static void view_print_ABGR(int x, int y, uint32_t color);
+static void view_clear_RGB(uint32_t color);
+static void view_clear_BGR(uint32_t color);
+static void view_clear_RGBA(uint32_t color);
+static void view_clear_BGRA(uint32_t color);
+static void view_clear_ARGB(uint32_t color);
+static void view_clear_ABGR(uint32_t color);
+
 /*
  *  UI系统初始化
  *  参数:
@@ -42,121 +62,278 @@ static View_Struct viewTrash = {
 int viewApi_init(char *ttfFile)
 {
     //平台初始化,获取屏幕缓存
-    view_map = (View_Map *)VIEW_MAP_INIT();
+    view_map = (uint8_t *)plat_init(&VIEW_X_SIZE, &VIEW_Y_SIZE, &VIEW_PB, (PLAT_COLOR_FORMAT *)&VIEW_COLOR_FT);
     if (!view_map)
     {
-        fprintf(stderr, "viewApi_init: VIEW_MAP_INIT failed !!\r\n");
+        fprintf(stderr, "viewApi_init: plat_init failed !!\r\n");
         return -1;
     }
+    VIEW_X_END = VIEW_X_SIZE - 1;
+    VIEW_Y_END = VIEW_Y_SIZE - 1;
+    //vsCommParent
+    vsCommParent.width = vsCommParent.absWidth = VIEW_X_SIZE;
+    vsCommParent.height = vsCommParent.absHeight = VIEW_Y_SIZE;
+    vsCommParent.absXY[1][0] = VIEW_X_SIZE - 1;
+    vsCommParent.absXY[1][1] = VIEW_Y_SIZE - 1;
+    //画图接口选择
+    if (VIEW_COLOR_FT == VIEW_COLOR_FORMAT_BGR)
+    {
+        _view_print = &view_print_BGR;
+        _view_clear = &view_clear_BGR;
+    }
+    else if (VIEW_COLOR_FT == VIEW_COLOR_FORMAT_RGBA)
+    {
+        _view_print = &view_print_RGB;
+        _view_clear = &view_clear_RGBA;
+    }
+    else if (VIEW_COLOR_FT == VIEW_COLOR_FORMAT_BGRA)
+    {
+        _view_print = &view_print_BGR;
+        _view_clear = &view_clear_BGRA;
+    }
+    else if (VIEW_COLOR_FT == VIEW_COLOR_FORMAT_ARGB)
+    {
+        _view_print = &view_print_ARGB;
+        _view_clear = &view_clear_ARGB;
+    }
+    else if (VIEW_COLOR_FT == VIEW_COLOR_FORMAT_ABGR)
+    {
+        _view_print = &view_print_ABGR;
+        _view_clear = &view_clear_ABGR;
+    }
+    else
+    {
+        _view_print = &view_print_RGB;
+        _view_clear = &view_clear_RGB;
+    }
     //配置文件初始化
-    viewConfig_init();
+    viewConfig_init(VIEW_X_SIZE, VIEW_Y_SIZE);
     //viewSrc初始化
-    viewSrc_init(ttfFile);
+    viewSrc_init(VIEW_X_SIZE, VIEW_Y_SIZE, ttfFile);
     //viewColor初始化
     viewColor_init();
     return 0;
 }
 
+//--------------------  屏幕基本信息 --------------------
+
+uint32_t view_width(void)
+{
+    return VIEW_X_SIZE;
+}
+uint32_t view_height(void)
+{
+    return VIEW_Y_SIZE;
+}
+uint32_t view_pixel_bytes(void) //每像素字节数
+{
+    return VIEW_PB;
+}
+VIEW_COLOR_FORMAT view_color_format(void) //像素排列
+{
+    return VIEW_COLOR_FT;
+}
+
 //--------------------  基本画图接口 --------------------
 
-void print_dot(int x, int y, uint32_t color)
+static void view_print_RGB(int x, int y, uint32_t color)
 {
-    //边界检查
-    if (x < 0 || x > VIEW_X_END ||
-        y < 0 || y > VIEW_Y_END)
-        return;
-
     //序列化成结构体,直接忽略掉a值
-    View_Point p = *((View_Point *)&color);
-
+    View_PointARGB p = *((View_PointARGB *)&color);
+    int offset = (y * VIEW_X_SIZE + x) * VIEW_PB;
+    //边界检查
+    if (x < 0 || x > VIEW_X_END || y < 0 || y > VIEW_Y_END)
+        return;
     //无透明度
     if (!p.a)
     {
-#if(VIEW_FORMAT == COLOR_FORMAT_RGB || VIEW_FORMAT == COLOR_FORMAT_RGBA)
-        view_map->grid[y][x][0] = p.r;
-        view_map->grid[y][x][1] = p.g;
-        view_map->grid[y][x][2] = p.b;
-#elif(VIEW_FORMAT == COLOR_FORMAT_BGR || VIEW_FORMAT == COLOR_FORMAT_BGRA)
-        view_map->grid[y][x][0] = p.b;
-        view_map->grid[y][x][1] = p.g;
-        view_map->grid[y][x][2] = p.r;
-#elif(VIEW_FORMAT == COLOR_FORMAT_ARGB)
-        view_map->grid[y][x][1] = p.r;
-        view_map->grid[y][x][2] = p.g;
-        view_map->grid[y][x][3] = p.b;
-#elif(VIEW_FORMAT == COLOR_FORMAT_ABGR)
-        view_map->grid[y][x][1] = p.b;
-        view_map->grid[y][x][2] = p.g;
-        view_map->grid[y][x][3] = p.r;
-#endif
+        view_map[offset++] = p.r;
+        view_map[offset++] = p.g;
+        view_map[offset] = p.b;
     }
     else if (p.a == 0xFF)
         ;
     //透明则按比例权重
     else
     {
-#if(VIEW_FORMAT == COLOR_FORMAT_RGB || VIEW_FORMAT == COLOR_FORMAT_RGBA)
-        view_map->grid[y][x][0] = (uint8_t)((view_map->grid[y][x][0] * p.a + p.r * (255 - p.a)) / 255);
-        view_map->grid[y][x][1] = (uint8_t)((view_map->grid[y][x][1] * p.a + p.g * (255 - p.a)) / 255);
-        view_map->grid[y][x][2] = (uint8_t)((view_map->grid[y][x][2] * p.a + p.b * (255 - p.a)) / 255);
-#elif(VIEW_FORMAT == COLOR_FORMAT_BGR || VIEW_FORMAT == COLOR_FORMAT_BGRA)
-        view_map->grid[y][x][0] = (uint8_t)((view_map->grid[y][x][0] * p.a + p.b * (255 - p.a)) / 255);
-        view_map->grid[y][x][1] = (uint8_t)((view_map->grid[y][x][1] * p.a + p.g * (255 - p.a)) / 255);
-        view_map->grid[y][x][2] = (uint8_t)((view_map->grid[y][x][2] * p.a + p.r * (255 - p.a)) / 255);
-#elif(VIEW_FORMAT == COLOR_FORMAT_ARGB)
-        view_map->grid[y][x][1] = (uint8_t)((view_map->grid[y][x][0] * p.a + p.r * (255 - p.a)) / 255);
-        view_map->grid[y][x][2] = (uint8_t)((view_map->grid[y][x][1] * p.a + p.g * (255 - p.a)) / 255);
-        view_map->grid[y][x][3] = (uint8_t)((view_map->grid[y][x][2] * p.a + p.b * (255 - p.a)) / 255);
-#elif(VIEW_FORMAT == COLOR_FORMAT_ABGR)
-        view_map->grid[y][x][1] = (uint8_t)((view_map->grid[y][x][0] * p.a + p.b * (255 - p.a)) / 255);
-        view_map->grid[y][x][2] = (uint8_t)((view_map->grid[y][x][1] * p.a + p.g * (255 - p.a)) / 255);
-        view_map->grid[y][x][3] = (uint8_t)((view_map->grid[y][x][2] * p.a + p.r * (255 - p.a)) / 255);
-#endif
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.r * (255 - p.a)) / 255);
+        offset += 1;
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.g * (255 - p.a)) / 255);
+        offset += 1;
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.b * (255 - p.a)) / 255);
     }
 }
-
-void print_clean(uint32_t color)
+static void view_print_BGR(int x, int y, uint32_t color)
 {
     //序列化成结构体,直接忽略掉a值
-    View_Point p = *((View_Point *)&color);
+    View_PointARGB p = *((View_PointARGB *)&color);
+    int offset = (y * VIEW_X_SIZE + x) * VIEW_PB;
+    //边界检查
+    if (x < 0 || x > VIEW_X_END || y < 0 || y > VIEW_Y_END)
+        return;
+    //无透明度
+    if (!p.a)
+    {
+        view_map[offset++] = p.b;
+        view_map[offset++] = p.g;
+        view_map[offset] = p.r;
+    }
+    else if (p.a == 0xFF)
+        ;
+    //透明则按比例权重
+    else
+    {
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.b * (255 - p.a)) / 255);
+        offset += 1;
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.g * (255 - p.a)) / 255);
+        offset += 1;
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.r * (255 - p.a)) / 255);
+    }
+}
+static void view_print_ARGB(int x, int y, uint32_t color)
+{
+    //序列化成结构体,直接忽略掉a值
+    View_PointARGB p = *((View_PointARGB *)&color);
+    int offset = (y * VIEW_X_SIZE + x) * VIEW_PB + 1;
+    //边界检查
+    if (x < 0 || x > VIEW_X_END || y < 0 || y > VIEW_Y_END)
+        return;
+    //无透明度
+    if (!p.a)
+    {
+        view_map[offset++] = p.r;
+        view_map[offset++] = p.g;
+        view_map[offset] = p.b;
+    }
+    else if (p.a == 0xFF)
+        ;
+    //透明则按比例权重
+    else
+    {
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.r * (255 - p.a)) / 255);
+        offset += 1;
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.g * (255 - p.a)) / 255);
+        offset += 1;
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.b * (255 - p.a)) / 255);
+    }
+}
+static void view_print_ABGR(int x, int y, uint32_t color)
+{
+    //序列化成结构体,直接忽略掉a值
+    View_PointARGB p = *((View_PointARGB *)&color);
+    int offset = (y * VIEW_X_SIZE + x) * VIEW_PB + 1;
+    //边界检查
+    if (x < 0 || x > VIEW_X_END || y < 0 || y > VIEW_Y_END)
+        return;
+    //无透明度
+    if (!p.a)
+    {
+        view_map[offset++] = p.b;
+        view_map[offset++] = p.g;
+        view_map[offset] = p.r;
+    }
+    else if (p.a == 0xFF)
+        ;
+    //透明则按比例权重
+    else
+    {
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.b * (255 - p.a)) / 255);
+        offset += 1;
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.g * (255 - p.a)) / 255);
+        offset += 1;
+        view_map[offset] = (uint8_t)((view_map[offset] * p.a + p.r * (255 - p.a)) / 255);
+    }
+}
+static void view_clear_RGB(uint32_t color)
+{
+    //序列化成结构体,直接忽略掉a值
+    View_PointARGB p = *((View_PointARGB *)&color);
     int i;
     for (i = 0; i < VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB;)
     {
-#if(VIEW_FORMAT == COLOR_FORMAT_RGB)
-        view_map->map[i++] = p.r;
-        view_map->map[i++] = p.g;
-        view_map->map[i++] = p.b;
-#elif(VIEW_FORMAT == COLOR_FORMAT_BGR)
-        view_map->map[i++] = p.b;
-        view_map->map[i++] = p.g;
-        view_map->map[i++] = p.r;
-#elif(VIEW_FORMAT == COLOR_FORMAT_RGBA)
-        view_map->map[i++] = p.r;
-        view_map->map[i++] = p.g;
-        view_map->map[i++] = p.b;
-        view_map->map[i++] = p.a;
-#elif(VIEW_FORMAT == COLOR_FORMAT_BGRA)
-        view_map->map[i++] = p.b;
-        view_map->map[i++] = p.g;
-        view_map->map[i++] = p.r;
-        view_map->map[i++] = p.a;
-#elif(VIEW_FORMAT == COLOR_FORMAT_ARGB)
-        view_map->map[i++] = p.a;
-        view_map->map[i++] = p.r;
-        view_map->map[i++] = p.g;
-        view_map->map[i++] = p.b;
-#elif(VIEW_FORMAT == COLOR_FORMAT_ABGR)
-        view_map->map[i++] = p.a;
-        view_map->map[i++] = p.b;
-        view_map->map[i++] = p.g;
-        view_map->map[i++] = p.r;
-#endif
+        view_map[i++] = p.r;
+        view_map[i++] = p.g;
+        view_map[i++] = p.b;
+    }
+}
+static void view_clear_BGR(uint32_t color)
+{
+    //序列化成结构体,直接忽略掉a值
+    View_PointARGB p = *((View_PointARGB *)&color);
+    int i;
+    for (i = 0; i < VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB;)
+    {
+        view_map[i++] = p.b;
+        view_map[i++] = p.g;
+        view_map[i++] = p.r;
+    }
+}
+static void view_clear_RGBA(uint32_t color)
+{
+    //序列化成结构体,直接忽略掉a值
+    View_PointARGB p = *((View_PointARGB *)&color);
+    int i;
+    for (i = 0; i < VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB;)
+    {
+        view_map[i++] = p.r;
+        view_map[i++] = p.g;
+        view_map[i++] = p.b;
+        view_map[i++] = p.a;
+    }
+}
+static void view_clear_BGRA(uint32_t color)
+{
+    //序列化成结构体,直接忽略掉a值
+    View_PointARGB p = *((View_PointARGB *)&color);
+    int i;
+    for (i = 0; i < VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB;)
+    {
+        view_map[i++] = p.b;
+        view_map[i++] = p.g;
+        view_map[i++] = p.r;
+        view_map[i++] = p.a;
+    }
+}
+static void view_clear_ARGB(uint32_t color)
+{
+    //序列化成结构体,直接忽略掉a值
+    View_PointARGB p = *((View_PointARGB *)&color);
+    int i;
+    for (i = 0; i < VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB;)
+    {
+        view_map[i++] = p.a;
+        view_map[i++] = p.r;
+        view_map[i++] = p.g;
+        view_map[i++] = p.b;
+    }
+}
+static void view_clear_ABGR(uint32_t color)
+{
+    //序列化成结构体,直接忽略掉a值
+    View_PointARGB p = *((View_PointARGB *)&color);
+    int i;
+    for (i = 0; i < VIEW_X_SIZE * VIEW_Y_SIZE * VIEW_PB;)
+    {
+        view_map[i++] = p.a;
+        view_map[i++] = p.b;
+        view_map[i++] = p.g;
+        view_map[i++] = p.r;
     }
 }
 
-void print_en(void)
+void view_print(int x, int y, uint32_t color)
 {
-    VIEW_MAP_EN();
+    (*_view_print)(x, y, color);
+}
+
+void view_clear(uint32_t color)
+{
+    (*_view_clear)(color);
+}
+
+void view_enable(void)
+{
+    plat_enable();
 }
 
 //--------------------- 延时和时间 --------------------
@@ -197,7 +374,7 @@ struct tm *view_time(void)
 
 void view_set_picAlpha(uint32_t *pic, uint8_t alpha, int width, int height, int pb)
 {
-    View_Point *p = (View_Point *)pic;
+    View_PointARGB *p = (View_PointARGB *)pic;
     int i;
     if (pb != 4)
         return;
@@ -238,7 +415,7 @@ uint32_t *view_getPic(char *picPath, int *width, int *height, int *pb)
     }
     //jpeg 和 bmp 读取数据默认为RGB格式,需转为BGRA格式
     else if (strstr(picPath, ".jpg") || strstr(picPath, ".JPG") ||
-        strstr(picPath, ".jpeg") || strstr(picPath, ".JPEG"))
+             strstr(picPath, ".jpeg") || strstr(picPath, ".JPEG"))
         ret = jpeg_get(picPath, width, height, pb);
 
     if (!ret)
@@ -434,7 +611,7 @@ void view_circle(
             if (xC2 < minX || xC2 > maxX)
                 continue;
             else if (memBUff[yC][xC])
-                print_dot(xC2, yC2, color);
+                view_print(xC2, yC2, color);
         }
     }
 }
@@ -500,24 +677,24 @@ void view_circleLoop(
         {
             if (div < 2) //div < 2 的都是画完整一圈的
             {
-                print_dot(xStart + circle_a, yStart - circle_b, color); //1
-                print_dot(xStart + circle_b, yStart - circle_a, color); //2
-                print_dot(xStart + circle_b, yStart + circle_a, color); //3
-                print_dot(xStart + circle_a, yStart + circle_b, color); //4
-                print_dot(xStart - circle_a, yStart + circle_b, color); //5
-                print_dot(xStart - circle_b, yStart + circle_a, color); //6
-                print_dot(xStart - circle_b, yStart - circle_a, color); //7
-                print_dot(xStart - circle_a, yStart - circle_b, color); //8
+                view_print(xStart + circle_a, yStart - circle_b, color); //1
+                view_print(xStart + circle_b, yStart - circle_a, color); //2
+                view_print(xStart + circle_b, yStart + circle_a, color); //3
+                view_print(xStart + circle_a, yStart + circle_b, color); //4
+                view_print(xStart - circle_a, yStart + circle_b, color); //5
+                view_print(xStart - circle_b, yStart + circle_a, color); //6
+                view_print(xStart - circle_b, yStart - circle_a, color); //7
+                view_print(xStart - circle_a, yStart - circle_b, color); //8
                 //if(circle_size > 1)
                 {
-                    print_dot(xStart + circle_a, yStart - circle_b + 1, color); //补点
-                    print_dot(xStart + circle_b - 1, yStart - circle_a, color); //补点
-                    print_dot(xStart + circle_b - 1, yStart + circle_a, color); //补点
-                    print_dot(xStart + circle_a, yStart + circle_b - 1, color); //补点
-                    print_dot(xStart - circle_a, yStart + circle_b - 1, color); //补点
-                    print_dot(xStart - circle_b + 1, yStart + circle_a, color); //补点
-                    print_dot(xStart - circle_b + 1, yStart - circle_a, color); //补点
-                    print_dot(xStart - circle_a, yStart - circle_b + 1, color); //补点
+                    view_print(xStart + circle_a, yStart - circle_b + 1, color); //补点
+                    view_print(xStart + circle_b - 1, yStart - circle_a, color); //补点
+                    view_print(xStart + circle_b - 1, yStart + circle_a, color); //补点
+                    view_print(xStart + circle_a, yStart + circle_b - 1, color); //补点
+                    view_print(xStart - circle_a, yStart + circle_b - 1, color); //补点
+                    view_print(xStart - circle_b + 1, yStart + circle_a, color); //补点
+                    view_print(xStart - circle_b + 1, yStart - circle_a, color); //补点
+                    view_print(xStart - circle_a, yStart - circle_b + 1, color); //补点
                 }
             }
             else //先记下一圈数据, 后期处理后再画
@@ -572,43 +749,43 @@ void view_circleLoop(
 
                 if (circle_a > rangeArray[0][0] && circle_a < rangeArray[0][1])
                 {
-                    print_dot(xStart + circle_a, yStart - circle_b, color);     //1
-                    print_dot(xStart + circle_a, yStart - circle_b + 1, color); //补点
+                    view_print(xStart + circle_a, yStart - circle_b, color);     //1
+                    view_print(xStart + circle_a, yStart - circle_b + 1, color); //补点
                 }
                 if (sumCount2 - circle_a > rangeArray[1][0] && sumCount2 - circle_a < rangeArray[1][1])
                 {
-                    print_dot(xStart + circle_b, yStart - circle_a, color);     //2
-                    print_dot(xStart + circle_b - 1, yStart - circle_a, color); //补点
+                    view_print(xStart + circle_b, yStart - circle_a, color);     //2
+                    view_print(xStart + circle_b - 1, yStart - circle_a, color); //补点
                 }
                 if (circle_a > rangeArray[2][0] && circle_a < rangeArray[2][1])
                 {
-                    print_dot(xStart + circle_b, yStart + circle_a, color);     //3
-                    print_dot(xStart + circle_b - 1, yStart + circle_a, color); //补点
+                    view_print(xStart + circle_b, yStart + circle_a, color);     //3
+                    view_print(xStart + circle_b - 1, yStart + circle_a, color); //补点
                 }
                 if (sumCount2 - circle_a > rangeArray[3][0] && sumCount2 - circle_a < rangeArray[3][1])
                 {
-                    print_dot(xStart + circle_a, yStart + circle_b, color);     //4
-                    print_dot(xStart + circle_a, yStart + circle_b - 1, color); //补点
+                    view_print(xStart + circle_a, yStart + circle_b, color);     //4
+                    view_print(xStart + circle_a, yStart + circle_b - 1, color); //补点
                 }
                 if (circle_a > rangeArray[4][0] && circle_a < rangeArray[4][1])
                 {
-                    print_dot(xStart - circle_a, yStart + circle_b, color);     //5
-                    print_dot(xStart - circle_a, yStart + circle_b - 1, color); //补点
+                    view_print(xStart - circle_a, yStart + circle_b, color);     //5
+                    view_print(xStart - circle_a, yStart + circle_b - 1, color); //补点
                 }
                 if (sumCount2 - circle_a > rangeArray[5][0] && sumCount2 - circle_a < rangeArray[5][1])
                 {
-                    print_dot(xStart - circle_b, yStart + circle_a, color);     //6
-                    print_dot(xStart - circle_b + 1, yStart + circle_a, color); //补点
+                    view_print(xStart - circle_b, yStart + circle_a, color);     //6
+                    view_print(xStart - circle_b + 1, yStart + circle_a, color); //补点
                 }
                 if (circle_a > rangeArray[6][0] && circle_a < rangeArray[6][1])
                 {
-                    print_dot(xStart - circle_b, yStart - circle_a, color);     //7
-                    print_dot(xStart - circle_b + 1, yStart - circle_a, color); //补点
+                    view_print(xStart - circle_b, yStart - circle_a, color);     //7
+                    view_print(xStart - circle_b + 1, yStart - circle_a, color); //补点
                 }
                 if (sumCount2 - circle_a > rangeArray[7][0] && sumCount2 - circle_a < rangeArray[7][1])
                 {
-                    print_dot(xStart - circle_a, yStart - circle_b, color);     //8
-                    print_dot(xStart - circle_a, yStart - circle_b + 1, color); //补点
+                    view_print(xStart - circle_a, yStart - circle_b, color);     //8
+                    view_print(xStart - circle_a, yStart - circle_b + 1, color); //补点
                 }
             }
         }
@@ -629,19 +806,19 @@ void view_dot(
     int size)
 {
     if (size == 1)
-        print_dot(xStart, yStart, color);
+        view_print(xStart, yStart, color);
     else if (size == 2)
     {
         //mid
-        print_dot(xStart, yStart, color);
+        view_print(xStart, yStart, color);
         //up
-        print_dot(xStart, yStart + 1, color);
+        view_print(xStart, yStart + 1, color);
         //down
-        print_dot(xStart, yStart - 1, color);
+        view_print(xStart, yStart - 1, color);
         //left
-        print_dot(xStart + 1, yStart, color);
+        view_print(xStart + 1, yStart, color);
         //right
-        print_dot(xStart - 1, yStart, color);
+        view_print(xStart - 1, yStart, color);
     }
     else if (size > 2)
         view_circle(color, xStart, yStart, size, 0, 0, 0, 9999, 9999);
@@ -1062,7 +1239,7 @@ void view_rectangle(
             if (xC < minX || xC > maxX)
                 continue;
             else if (outPutArray[i][j])
-                print_dot(xC, yC, color);
+                view_print(xC, yC, color);
         }
     }
 
@@ -1157,9 +1334,9 @@ void view_rectangle_padding(
             color = pic[yPic * picWidth + (int)xStep];
 
             if (useReplaceColor && color == replaceColor)
-                print_dot(xC, yC, replaceColorBy);
+                view_print(xC, yC, replaceColorBy);
             else
-                print_dot(xC, yC, color);
+                view_print(xC, yC, color);
         }
     }
 }
@@ -1265,9 +1442,9 @@ void view_parallelogram(
                 if (xC < minX || xC > maxX)
                     continue;
                 if (sSize == 0)
-                    print_dot(xC, yC, color);
+                    view_print(xC, yC, color);
                 else if (yC < yStart + sSize || xC < xCount + sSize || yC > yEnd2 - sSize || xC > xCount + width - sSize)
-                    print_dot(xC, yC, color);
+                    view_print(xC, yC, color);
             }
         }
 
@@ -1294,12 +1471,12 @@ void view_parallelogram(
             if (xC < minX || xC > maxX)
                 continue;
             if (sSize == 0)
-                print_dot(xC, yC, color);
+                view_print(xC, yC, color);
             else if (yC < yStart + sSize ||
                      xC < xCount + sSize ||
                      yC > yEnd2 - sSize ||
                      xC > xCount + width - sSize)
-                print_dot(xC, yC, color);
+                view_print(xC, yC, color);
         }
     }
 }
@@ -1338,14 +1515,14 @@ void view_printBitMap(
     for (y = 0, yp = yStart; y < map.bitTop; y += 1, yp += 1)
     {
         for (x = 0, xp = xStart; x < map.width; x++, xp += 1)
-            print_dot(xp, yp, bColor);
+            view_print(xp, yp, bColor);
     }
     //正文
     for (byteTotalCount = 0, yp = y + yStart; byteTotalCount < byteTotal && y < map.height; y += 1, yp += 1)
     {
         //横向起始跳过点数
         for (x = 0, xp = xStart; x < map.bitLeft; x += 1, xp += 1)
-            print_dot(xp, yp, bColor);
+            view_print(xp, yp, bColor);
         //正文
         for (lineByteCount = 0; lineByteCount < map.lineByte; lineByteCount++, byteTotalCount += 1)
         {
@@ -1353,21 +1530,21 @@ void view_printBitMap(
             for (i = 0, bit = map.bitMap[byteTotalCount]; i < 8 && x < map.width; i++, x += 1)
             {
                 if (bit & 0x80)
-                    print_dot(x + xStart, y + yStart, fColor);
+                    view_print(x + xStart, y + yStart, fColor);
                 else
-                    print_dot(x + xStart, y + yStart, bColor);
+                    view_print(x + xStart, y + yStart, bColor);
                 bit <<= 1;
             }
         }
         //横向补足点数
         for (x = 0, xp = xStart; x < map.bitLeft; x += 1, xp += 1)
-            print_dot(xp, yp, bColor);
+            view_print(xp, yp, bColor);
     }
     //纵向补足行数
     for (yp = y + yStart; y < map.height; y += 1, yp += 1)
     {
         for (x = 0, xp = xStart; x < map.width; x++, xp += 1)
-            print_dot(xp, yp, bColor);
+            view_print(xp, yp, bColor);
     }
 }
 
@@ -3361,25 +3538,25 @@ int view_draw2(
     if (viewParent)
         parent = viewParent;
     else
-        parent = &ViewCommonParent;
+        parent = &vsCommParent;
 
     //再次确认父子关系(防止爸爸为空)
     view->parent = parent;
 
     //现在绘制的是顶层view
-    if (parent == &ViewCommonParent)
+    if (parent == &vsCommParent)
     {
-        //避免多条线同时使用 ViewCommonParent 作父控件
+        //避免多条线同时使用 vsCommParent 作父控件
         //造成 tickOfDraw 的跳变增加; 子 view 可以通过缓存
         //该值,比较是否每次+1来判断是否第一次进入自己的界面
-        ViewCommonParent.tickOfDraw += 1;
+        vsCommParent.tickOfDraw += 1;
 
-        //更新一次 ViewCommonParent 的系统滴答时钟
-        ViewCommonParent.tickOfTimeMs = view_tickMs();
+        //更新一次 vsCommParent 的系统滴答时钟
+        vsCommParent.tickOfTimeMs = view_tickMs();
     }
 
     //共享滴答时钟
-    view->tickOfTimeMs = ViewCommonParent.tickOfTimeMs;
+    view->tickOfTimeMs = vsCommParent.tickOfTimeMs;
 
     //当前view是第一次绘制
     if (view->tickOfDraw != parent->tickOfDraw)
@@ -3392,7 +3569,7 @@ int view_draw2(
 
     //子 view 的限制范围在父 view 内且在 xyLimit 内
     if (view->overDraw || !xyLimit)
-        memcpy(&xyLimitVsTemp, &ViewCommonParent.absXY, sizeof(xyLimitVsTemp));
+        memcpy(&xyLimitVsTemp, &vsCommParent.absXY, sizeof(xyLimitVsTemp));
     else
     {
         memcpy(&xyLimitVsTemp, &view->absXY, sizeof(xyLimitVsTemp));
@@ -3414,7 +3591,7 @@ int view_draw2(
     //     view->absHeight,
     //     view->absXY[0][1], view->absXY[1][1],
     //     xyLimitVsTemp[0][1], xyLimitVsTemp[1][1],
-    //     view->tickOfDraw, ViewCommonParent.tickOfDraw);
+    //     view->tickOfDraw, vsCommParent.tickOfDraw);
 
     //开始绘图
     if (view->disable ||
@@ -4139,8 +4316,8 @@ void view_input(
     View_Struct *vsTemp, *retView = NULL;
     _InputBackup_Struct *ibs;
 
-    int labelSize = ViewSrc.Label_Size.value.Int;
-    int contentSize = ViewSrc.Content_Type.value.Int;
+    int labelSize = ViewSrc.Label_Size.value.Int / 10;
+    int contentSize = ViewSrc.Content_Type.value.Int / 10;
     int contentSize2 = 4;
     int contentMinSize = 32;
     int lineSize = 2;

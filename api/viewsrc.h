@@ -7,7 +7,6 @@ extern "C"
 {
 #endif
 
-#include "viewplat.h"
 #include "viewtype.h"
 #include "ttftype.h"
 
@@ -64,9 +63,9 @@ extern ViewColor_Type ViewColor;   //公共颜色资源
 extern void *ViewTTF;              //公共ttf解析控制符(用来调用ttfType.h中的接口用)
 
 //配置文件初始化
-void viewConfig_init(void);
+void viewConfig_init(int width, int height);
 //viewSrc初始化
-void viewSrc_init(char *ttfFile);
+void viewSrc_init(int width, int height, char *ttfFile);
 //viewColor初始化
 void viewColor_init(void);
 
