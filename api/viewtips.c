@@ -30,7 +30,7 @@ void view_tips_clean(View_Struct *window, char *msg, uint32_t color)
     while(view)
     {
         //匹配控件名称
-        if (view->name[0] && strncmp(view->name, "tips", 4) == 0)
+        if (view->name[0] && strncmp(view->name, "tips", 4) == 0 && view->text)
         {
             //匹配内容
             if (!msg || strncmp(view->text->value.String, msg, strlen(msg)) == 0)
@@ -54,24 +54,25 @@ void view_tips_clean(View_Struct *window, char *msg, uint32_t color)
  *      window: 目标窗口
  *      msg: 内容
  *      color: 文字颜色
+ *      textSize: 字号,如240表示24x24大小不加粗,写0使用默认字体
  *      delayms: 滞留时长
  */
-void view_tips_add(View_Struct *window, char *msg, uint32_t color, uint32_t delayms)
+void view_tips_add(View_Struct *window, char *msg, uint32_t color, int textSize, uint32_t delayms)
 {
     View_Struct *vs;
     //检查
     if (!msg)
         return;
-    //全屏
+    //全屏占用
     vs = view_init("tips", VWHT_MATCH, VWHT_MATCH, 0, 0);
     //半透明灰色色覆盖背景
     vs->backGroundColor = 0x20404040;
     //文字
     vs->text = viewValue_init(NULL, VT_STRING, 1, msg);
     vs->textColor = color;
-    vs->textEdgeX = 1;
-    vs->textEdgeY = 1;
-    vs->textSize = ViewSrc.Content_Type.value.Int;
+    vs->textEdgeX = 2;
+    vs->textEdgeY = 5;
+    vs->textSize = textSize ? textSize : (ViewSrc.Content_Type.value.Int * 10);
     //目标时间,到达这个时间则关闭窗口
     vs->textBakup = viewValue_init(NULL, VT_INT, 1, view_tickMs() + delayms);
     //绘制前回调

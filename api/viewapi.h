@@ -218,9 +218,10 @@ void view_tips_clean(View_Struct *window, char *msg, uint32_t color);
  *      window: 目标窗口
  *      msg: 内容
  *      color: 文字颜色
+ *      textSize: 字号,如240表示24x24大小不加粗,写0使用默认字体
  *      delayms: 滞留时长
  */
-void view_tips_add(View_Struct *window, char *msg, uint32_t color, uint32_t delayms);
+void view_tips_add(View_Struct *window, char *msg, uint32_t color, int textSize, uint32_t delayms);
 
 //-------------- 根据内容和限制宽度,获取可能的最大字体 ----------
 
