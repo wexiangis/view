@@ -62,12 +62,10 @@ void view_tips_add(View_Struct *window, char *msg, uint32_t color, uint32_t dela
     //检查
     if (!msg)
         return;
-    //占用半屏
-    vs = view_init("tips", VWHT_MATCH, VWHT_MATCH * 2, 0, 0);
-    vs->centerY = true;
+    //全屏
+    vs = view_init("tips", VWHT_MATCH, VWHT_MATCH, 0, 0);
     //半透明灰色色覆盖背景
     vs->backGroundColor = 0x20404040;
-    vs->backGroundRad = 15;
     //文字
     vs->text = viewValue_init(NULL, VT_STRING, 1, msg);
     vs->textColor = color;
