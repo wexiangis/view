@@ -6,11 +6,11 @@
 
 * make demo # 编译演示程序
 
-* ./demo-app # 运行演示程序,同时产生 screem.bmp 屏幕文件
+* ./demo-app # 运行演示程序,同时产生 screen.bmp 屏幕文件
 
 ## 运行环境部署
 
-* make libs 之后,拷贝 ./libs/lib/*.so* 到 /usr/lib/
+* make libs 之后,拷贝 ./libs/lib/\*.so\* 到 /usr/lib/
 
 ## 切换 framebuffer 输出
 
