@@ -10,15 +10,15 @@
 int myView_vStart(View_Struct *view, void *object, View_Focus *focus, ViewButtonTouch_Event *event)
 {
     View_Struct *vsTemp;
-    struct tm *time = view_time();
+    struct tm *time = view_time(); //年月不需要再加1900和1
 
     if (view->isFirstIn)
         printf("myView_vStart: first in \r\n");
 
     //取得链表第一个节点,更新日期
     vsTemp = view->view;
-    vsTemp->text->value.IntArray[0] = time->tm_year + 1900;
-    vsTemp->text->value.IntArray[1] = time->tm_mon + 1;
+    vsTemp->text->value.IntArray[0] = time->tm_year;
+    vsTemp->text->value.IntArray[1] = time->tm_mon;
     vsTemp->text->value.IntArray[2] = time->tm_mday;
 
     //取得链表第2个节点,更新时间

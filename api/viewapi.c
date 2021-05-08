@@ -366,8 +366,19 @@ uint32_t view_tickMs(void)
 struct tm *view_time(void)
 {
     static time_t now;
+    struct tm *t;
     time(&now);
-    return localtime(&now);
+    t = localtime(&now);
+    //矫正年月
+    t->tm_year += 1900;
+    t->tm_mon += 1;
+    //根据时区矫正到北京时间(如果编译报错,请自行切换)
+#if 1
+    t->tm_hour = (t->tm_hour + (28800 - t->tm_gmtoff) / 3600) % 24;
+#else
+    t->tm_hour = (t->tm_hour + (28800 - t->__tm_gmtoff) / 3600) % 24;
+#endif
+    return t;
 }
 
 //--------------------- 图片内存管理 --------------------
