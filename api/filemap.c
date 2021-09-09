@@ -271,10 +271,25 @@ FbMap_Struct *fbMap_open(char *fbDev)
         goto exit;
     }
 
+    // printf("fb: xres_virtual/%d yres_virtual/%d xoffset/%d yoffset/%d \n",
+    //     fms->fbInfo.xres_virtual,
+    //     fms->fbInfo.yres_virtual,
+    //     fms->fbInfo.xoffset,
+    //     fms->fbInfo.yoffset);
+
     fms->bpp = fms->fbInfo.bits_per_pixel / 8;
-    fms->bw = fms->bpp * fms->fbInfo.xres;
-    fms->bh = fms->bpp * fms->fbInfo.yres;
-    fms->size = fms->fbInfo.xres * fms->fbInfo.yres * fms->bpp;
+
+    if (fms->fbInfo.xres < fms->fbInfo.xres_virtual)
+        fms->width = fms->fbInfo.xres_virtual;
+    else
+        fms->width = fms->fbInfo.xres;
+
+    if (fms->fbInfo.yres < fms->fbInfo.yres_virtual)
+        fms->height = fms->fbInfo.yres_virtual;
+    else
+        fms->height = fms->fbInfo.yres;
+
+    fms->size = fms->width * fms->height * fms->bpp;
 
     if(!(fms->fb = (uint8_t *)mmap(0, fms->size, PROT_READ | PROT_WRITE, MAP_SHARED, fms->fd, 0)))
     {

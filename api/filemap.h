@@ -39,7 +39,7 @@ typedef struct
     //每像素字节数
     int bpp;
     //bytes of width, height
-    int bw, bh;
+    int width, height;
 } FbMap_Struct;
 
 typedef struct

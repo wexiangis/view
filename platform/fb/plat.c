@@ -33,8 +33,8 @@ void *plat_init(
         fprintf(stderr, "plat_map_init: fbMap_open %s failed \r\n", FB_DEV);
         return NULL;
     }
-    printf("plat_map_init: %s %d x %d x %d \r\n",
-        FB_DEV, fbmap->fbInfo.xres, fbmap->fbInfo.yres, fbmap->bpp);
+    printf("plat_map_init: %s %d(%d) x %d(%d) x %d \r\n",
+        FB_DEV, fbmap->fbInfo.xres, fbmap->width, fbmap->fbInfo.yres, fbmap->height, fbmap->bpp);
 
     *width = fbmap->fbInfo.xres;
     *height = fbmap->fbInfo.yres;
@@ -42,7 +42,7 @@ void *plat_init(
     *format = FB_COLOR_FORMAT;
 
     //不直接使用fb的内存
-    plat_map = calloc(fbmap->size, 1);
+    plat_map = calloc(fbmap->fbInfo.xres * fbmap->fbInfo.yres * fbmap->bpp, 1);
     return plat_map;
 }
 
@@ -51,7 +51,27 @@ void *plat_init(
  */
 void plat_enable(void)
 {
+    int i, srcLineSize, distLineSize;
+    uint8_t *pSrc, *pDist;
+
     if (!fbmap)
         return;
-    memcpy(fbmap->fb, plat_map, fbmap->size);
+
+    if (fbmap->fbInfo.xres == fbmap->width && fbmap->fbInfo.yres == fbmap->height)
+        memcpy(fbmap->fb, plat_map, fbmap->size);
+    else
+    {
+        srcLineSize = fbmap->fbInfo.xres * fbmap->bpp;
+        distLineSize = fbmap->width * fbmap->bpp;
+
+        pSrc = plat_map;
+        pDist = fbmap->fb + (fbmap->fbInfo.yoffset * fbmap->width + fbmap->fbInfo.xoffset) * fbmap->bpp;
+
+        for (i = 0; i < fbmap->fbInfo.yres; i++)
+        {
+            memcpy(pDist, pSrc, srcLineSize);
+            pSrc += srcLineSize;
+            pDist += distLineSize;
+        }
+    }
 }
