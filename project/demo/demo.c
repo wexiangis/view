@@ -4,8 +4,10 @@
 
 //资源文件夹
 #define RES_PATH "./project/demo/res"
+
 //ttf文件在资源文件夹内
 #define TTF_FILE RES_PATH"/Droid_Sans_Fallback.ttf"
+// #define TTF_FILE RES_PATH"/ZhaiZaiJiaMaiKeBi.ttf"
 
 int myView_vStart(View_Struct *view, void *object, View_Focus *focus, ViewButtonTouch_Event *event)
 {
@@ -101,6 +103,10 @@ View_Struct *myView_init(void)
     vsTemp->shapeColorPrint = 0xB000FFFF;
     //指定图片,会自动缩放为当前控件大小
     vsTemp->picPath = RES_PATH "/signal.png";
+    //文字
+    vsTemp->text = viewValue_init(NULL, VT_STRING, 1, "你好,世界!");
+    vsTemp->textSize = 320;
+    vsTemp->textColor = 0xFFFFFF;
     //添加到父控件链表
     view_add(vs, vsTemp, false);
 

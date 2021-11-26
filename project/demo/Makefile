@@ -12,7 +12,7 @@ INC += -I$(LIBS)/include
 # -L
 LIB += -L$(LIBS)/lib
 # -l 注意依赖顺序 -lui 要放到其它依赖库前面
-CFLAG += -Wall -lui -lfreetype -ljpeg -lz -lpng -lpthread -lm
+CFLAG += -lui -lfreetype -ljpeg -lpng -lz -lpthread -lm -Wall
 # 完全使用静态库时启用
 CFLAG += -static
 
@@ -20,5 +20,5 @@ CFLAG += -static
 SRC += ${wildcard $(ROOT)/*.c}
 
 # 生成目标文件到上级目录
-all:
+target:
 	@$(GCC) -o $(ROOT)/../../demo-app $(SRC) $(INC) $(LIB) $(CFLAG)
